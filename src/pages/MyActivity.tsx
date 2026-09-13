@@ -10,7 +10,9 @@ import useMedicationDue from "@/hooks/useMedicationDue";
 const MyActivity = () => {
   const navigate = useNavigate();
   const stats = useLiveDashboardStats();
-  const medsAlert = useRefillDue() || useMedicationDue();
+  const refillDue = useRefillDue();
+  const medDue = useMedicationDue();
+  const medsAlert = refillDue || medDue;
 
   const sections = [
     {
