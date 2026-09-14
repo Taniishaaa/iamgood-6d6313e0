@@ -194,6 +194,13 @@ self.addEventListener("notificationclick", (event: NotificationEvent) => {
   const data: any = event.notification.data || {};
   event.notification.close();
 
+  if (action === "dismiss") return;
+
+  if (action === "checkin") {
+    event.waitUntil(self.clients.openWindow(data.url || "/") as Promise<any>);
+    return;
+  }
+
   if (action === "taken" && data.medication_id && data.user_id) {
     event.waitUntil(
       (async () => {
