@@ -372,13 +372,10 @@ async function sendPDFDoc(phone: string, wardName: string, weekLabel: string, pd
       payload: {
         integrated_number: INTEGRATED_NUMBER,
         recipient_number: phone,
-        content_type: "media",
-        payload: {
-          messaging_product: "whatsapp",
-          to: phone,
-          type: "media",
-          media: { type: "document", ...document },
-        },
+        content_type: "document",
+        attachment_url: pdfUrl,
+        filename,
+        text: caption,
       },
     },
     {
@@ -386,16 +383,14 @@ async function sendPDFDoc(phone: string, wardName: string, weekLabel: string, pd
       payload: {
         integrated_number: INTEGRATED_NUMBER,
         recipient_number: phone,
-        content_type: "document",
-        payload: {
-          messaging_product: "whatsapp",
-          to: phone,
-          type: "document",
-          document,
-        },
+        content_type: "attachment",
+        attachment_url: pdfUrl,
+        filename,
+        text: caption,
       },
     },
   ];
+  void document;
 
   for (const a of attempts) {
     try {
