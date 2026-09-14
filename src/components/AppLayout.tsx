@@ -38,6 +38,7 @@ import SafeZoneExitPrompt from "@/components/SafeZoneExitPrompt";
 const UserOnlyHooks = () => {
   useCheckInAudio();
   useMedicationAlarms();
+  useCheckInAlarms();
   useAppointmentAlarms();
   useExerciseReminder();
   useLocationSync();
