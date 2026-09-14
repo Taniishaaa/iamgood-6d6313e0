@@ -173,6 +173,17 @@ self.addEventListener("push", (event: PushEvent) => {
         ]
       : [],
   };
+  if (data.type === "checkin_missed") {
+    options.requireInteraction = true;
+    // @ts-ignore
+    options.vibrate = [300, 150, 300, 150, 300];
+    // @ts-ignore
+    options.actions = [
+      { action: "checkin", title: "✓ Check In Now" },
+      { action: "dismiss", title: "Dismiss" },
+    ];
+  }
+
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
