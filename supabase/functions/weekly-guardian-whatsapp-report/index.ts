@@ -92,6 +92,7 @@ async function buildStats(
 
   const missedCheckInDetails = ci
     .filter((r: any) => r.status === "missed")
+    .sort((a: any, b: any) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
     .map((r: any) =>
       new Date(r.scheduled_at).toLocaleDateString("en-IN", {
         weekday: "short", day: "2-digit", month: "short",
@@ -176,9 +177,11 @@ function generatePDF(opts: {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(26);
   doc.setTextColor(sr, sg, sb);
-  doc.text(String(stats.healthScore), 30, y + 18);
+  const scoreStr = String(stats.healthScore);
+  doc.text(scoreStr, 30, y + 18);
+  const scoreW = doc.getTextWidth(scoreStr);
   doc.setFontSize(10);
-  doc.text("/100", 30 + doc.getTextWidth(String(stats.healthScore)), y + 18);
+  doc.text("/100", 30 + scoreW + 1.5, y + 18);
   doc.setFontSize(13);
   doc.setTextColor(15, 30, 53);
   doc.text(`Health Score: ${scoreLabel(stats.healthScore)}`, 72, y + 12);
@@ -242,7 +245,7 @@ function generatePDF(opts: {
     stats.missedCheckInDetails.forEach((dt: string) => {
       doc.setFillColor(253, 242, 242); doc.roundedRect(14, y, W - 28, 7.5, 2, 2, "F");
       doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
-      doc.setTextColor(229, 83, 83); doc.text("-", 18, y + 5);
+      doc.setTextColor(229, 83, 83); doc.circle(19, y + 3.7, 1, "F");
       doc.setTextColor(26, 26, 26); doc.text(dt, 24, y + 5);
       y += 9;
     });
