@@ -245,7 +245,7 @@ function generatePDF(opts: {
     stats.missedCheckInDetails.forEach((dt: string) => {
       doc.setFillColor(253, 242, 242); doc.roundedRect(14, y, W - 28, 7.5, 2, 2, "F");
       doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
-      doc.setTextColor(229, 83, 83); doc.circle(19, y + 3.7, 1, "F");
+      doc.setFillColor(229, 83, 83); doc.circle(19, y + 3.7, 1, "F");
       doc.setTextColor(26, 26, 26); doc.text(dt, 24, y + 5);
       y += 9;
     });
