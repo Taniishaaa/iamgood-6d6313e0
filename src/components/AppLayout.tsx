@@ -17,6 +17,7 @@ import { PRIVACY_POLICY_PDF_URL } from "@/lib/legal";
 import BatteryWarning from "@/components/BatteryWarning";
 import useCheckInAudio from "@/hooks/useCheckInAudio";
 import useMedicationAlarms from "@/hooks/useMedicationAlarms";
+import useCheckInAlarms from "@/hooks/useCheckInAlarms";
 import useAppointmentAlarms from "@/hooks/useAppointmentAlarms";
 import useExerciseReminder from "@/hooks/useExerciseReminder";
 import useAutoPauseModes from "@/hooks/useAutoPauseModes";
@@ -37,6 +38,7 @@ import SafeZoneExitPrompt from "@/components/SafeZoneExitPrompt";
 const UserOnlyHooks = () => {
   useCheckInAudio();
   useMedicationAlarms();
+  useCheckInAlarms();
   useAppointmentAlarms();
   useExerciseReminder();
   useLocationSync();

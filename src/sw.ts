@@ -173,6 +173,17 @@ self.addEventListener("push", (event: PushEvent) => {
         ]
       : [],
   };
+  if (data.type === "checkin_missed") {
+    options.requireInteraction = true;
+    // @ts-ignore
+    options.vibrate = [300, 150, 300, 150, 300];
+    // @ts-ignore
+    options.actions = [
+      { action: "checkin", title: "✓ Check In Now" },
+      { action: "dismiss", title: "Dismiss" },
+    ];
+  }
+
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
@@ -182,6 +193,13 @@ self.addEventListener("notificationclick", (event: NotificationEvent) => {
   const action = event.action;
   const data: any = event.notification.data || {};
   event.notification.close();
+
+  if (action === "dismiss") return;
+
+  if (action === "checkin") {
+    event.waitUntil(self.clients.openWindow(data.url || "/") as Promise<any>);
+    return;
+  }
 
   if (action === "taken" && data.medication_id && data.user_id) {
     event.waitUntil(

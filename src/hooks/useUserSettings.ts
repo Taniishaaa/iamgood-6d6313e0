@@ -58,6 +58,7 @@ export interface UserSettings {
   medicationMissedNotify: boolean;
   // Check-In
   checkInTimes: string[]; // "HH:MM" slots that drive the daily check-in prompts
+  activeCheckInHours: number[]; // e.g. [7, 12, 19] — hours in 24h format (Active mode)
   sleepMode: boolean;
   pauseMode: PauseMode;
   defaultNapDurationMins: number;
@@ -140,6 +141,7 @@ const DEFAULTS: UserSettings = {
   weeklyReport: true,
   medicationMissedNotify: true,
   checkInTimes: ["07:00", "12:00", "19:00"],
+  activeCheckInHours: [7, 12, 19],
   sleepMode: true,
   pauseMode: "active",
   defaultNapDurationMins: 60,

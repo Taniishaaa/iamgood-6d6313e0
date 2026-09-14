@@ -108,7 +108,13 @@ const CheckInCard = () => {
   const [slotStatuses, setSlotStatuses] = useState<Record<number, string>>({});
 
   const { settings } = useUserSettings();
-  const CHECK_IN_HOURS = useMemo(() => parseCheckInHours(settings?.checkInTimes), [settings?.checkInTimes]);
+  const CHECK_IN_HOURS = useMemo(() => {
+    const hours = settings?.activeCheckInHours;
+    if (Array.isArray(hours) && hours.length > 0) {
+      return Array.from(new Set(hours.filter((h) => Number.isFinite(h) && h >= 0 && h <= 23))).sort((a, b) => a - b);
+    }
+    return parseCheckInHours(settings?.checkInTimes);
+  }, [settings?.activeCheckInHours, settings?.checkInTimes]);
 
   const checkInTimes = CHECK_IN_HOURS.map(formatHour);
 

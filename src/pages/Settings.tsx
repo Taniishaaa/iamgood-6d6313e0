@@ -13,7 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import {
   Settings as SettingsIcon, Bell, BellRing, Volume2, MessageSquare, Vibrate,
   Clock, Moon, Star, AlertTriangle, CalendarClock, Users, Globe, Lock, Shield,
-  Plus, Trash2, Phone, Mail, CheckCircle, XCircle, HelpCircle, Loader2, Dumbbell, ShieldCheck
+  Plus, Trash2, Phone, Mail, CheckCircle, XCircle, HelpCircle, Loader2, Dumbbell, ShieldCheck, Heart
 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import SafeZoneEditor from "@/components/SafeZoneEditor";
@@ -346,6 +346,18 @@ const Settings = () => {
   const { session } = useAuth();
 
   const { settings, updateSetting } = useUserSettings();
+
+  // Active-mode check-in hour helpers
+  const formatCheckInHour = (h: number) =>
+    h === 0 ? "12:00 AM" : h < 12 ? `${h}:00 AM` : h === 12 ? "12:00 PM" : `${h - 12}:00 PM`;
+
+  const saveCheckInHours = (hours: number[]) => {
+    const clean = [...new Set(hours.filter((h) => Number.isFinite(h) && h >= 0 && h <= 23))].sort((a, b) => a - b);
+    if (clean.length === 0) return;
+    updateSetting("activeCheckInHours", clean);
+    // Keep the "HH:MM" list (used by the dashboard Check-in card) in sync
+    updateSetting("checkInTimes", clean.map((h) => `${String(h).padStart(2, "0")}:00`));
+  };
 
   // Guardians state
   const [guardians, setGuardians] = useState<Guardian[]>([]);
@@ -724,6 +736,81 @@ const Settings = () => {
                 <Star className="w-3.5 h-3.5" /> Check-Out
               </Badge>
             </div>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Heart className="w-5 h-5 text-primary" />
+                  Active Check-in Times
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Set the times you want to check-in each day when in Active mode. Minimum 1, maximum 6 times per day.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  {(settings.activeCheckInHours ?? [7, 12, 19]).map((hour: number, idx: number) => (
+                    <div key={idx} className="flex items-center gap-3">
+                      <div className="flex-1 bg-muted/50 rounded-lg px-3 py-2 text-sm font-medium">
+                        {formatCheckInHour(hour)}
+                      </div>
+                      <Select
+                        value={String(hour)}
+                        onValueChange={(val) => {
+                          const newHours = [...(settings.activeCheckInHours ?? [7, 12, 19])];
+                          newHours[idx] = Number(val);
+                          saveCheckInHours([...new Set(newHours)].sort((a, b) => a - b));
+                        }}
+                      >
+                        <SelectTrigger className="w-[140px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 24 }, (_, h) => (
+                            <SelectItem key={h} value={String(h)}>
+                              {formatCheckInHour(h)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {(settings.activeCheckInHours ?? [7, 12, 19]).length > 1 && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 shrink-0"
+                          onClick={() =>
+                            saveCheckInHours(
+                              (settings.activeCheckInHours ?? [7, 12, 19]).filter((_: number, i: number) => i !== idx)
+                            )
+                          }
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {(settings.activeCheckInHours ?? [7, 12, 19]).length < 6 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full gap-2"
+                    onClick={() => {
+                      const existing = settings.activeCheckInHours ?? [7, 12, 19];
+                      const freeHour = [8, 13, 18, 20, 10, 15].find((h) => !existing.includes(h)) ?? 9;
+                      saveCheckInHours([...existing, freeHour].sort((a, b) => a - b));
+                    }}
+                  >
+                    <Plus className="w-4 h-4" /> Add Check-in Time
+                  </Button>
+                )}
+
+                <p className="text-xs text-muted-foreground">
+                  Changes take effect from the next scheduled check-in.
+                </p>
+              </CardContent>
+            </Card>
 
             <Card>
               <CardHeader className="pb-2">

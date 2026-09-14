@@ -381,13 +381,29 @@ export const playVoiceReminder = async (message = "It's time for your Check-iN")
   window.speechSynthesis.speak(utterance);
 };
 
-export const showBrowserNotification = (title: string, body: string) => {
+export const showBrowserNotification = (
+  title: string,
+  bodyOrOptions: string | (NotificationOptions & { vibrate?: number[] })
+) => {
   if (!("Notification" in window)) return;
+  const opts: NotificationOptions =
+    typeof bodyOrOptions === "string"
+      ? { body: bodyOrOptions, icon: "/favicon.ico" }
+      : ({ icon: "/favicon.ico", ...bodyOrOptions } as NotificationOptions);
+
+  const show = () => {
+    try {
+      new Notification(title, opts);
+    } catch {
+      // ignore
+    }
+  };
+
   if (Notification.permission === "granted") {
-    new Notification(title, { body, icon: "/favicon.ico" });
+    show();
   } else if (Notification.permission !== "denied") {
     Notification.requestPermission().then((p) => {
-      if (p === "granted") new Notification(title, { body, icon: "/favicon.ico" });
+      if (p === "granted") show();
     });
   }
 };
