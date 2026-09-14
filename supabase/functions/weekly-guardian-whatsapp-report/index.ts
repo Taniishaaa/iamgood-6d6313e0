@@ -518,6 +518,13 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        if (testPhone) {
+          sentCount++;
+          console.log(`[wa-report] test send to +${testPhone} done (no log row)`);
+          break;
+        }
+
+
         await supabase.from("email_send_log").insert({
           template_name: "weekly-wa-report",
           recipient_email: g.guardian_email || g.guardian_phone,
