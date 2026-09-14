@@ -183,9 +183,34 @@ const Login = () => {
                       className="border-0 shadow-none bg-transparent h-12"
                     />
                   </div>
-                  {hasInput && !isValid && (
-                    <p className="text-[11px] text-auth-red mt-1.5">Enter a valid number with country code</p>
-                  )}
+                  {(() => {
+                    if (!hasInput) return null;
+                    const digits = identifier.replace(/\D/g, "");
+                    const isIndianNum = identifier.replace(/\s+/g, "").startsWith("+91") || (digits.startsWith("91") && digits.length >= 11);
+                    const nationalDigits = isIndianNum ? digits.slice(digits.startsWith("91") ? 2 : 0) : digits;
+                    if (isIndianNum && nationalDigits.length > 0 && nationalDigits.length !== 10) {
+                      return (
+                        <div className="flex items-center gap-1.5 mt-1.5">
+                          <p className="text-[11px] text-auth-red flex-1">
+                            Indian numbers must be 10 digits — you entered {nationalDigits.length}. The +91 is added automatically.
+                          </p>
+                          <span className="text-[11px] font-bold text-auth-red ml-2">{nationalDigits.length}/10</span>
+                        </div>
+                      );
+                    }
+                    if (isIndianNum && nationalDigits.length === 10) {
+                      return (
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className="text-[11px] text-auth-green">✓ 10 digits</span>
+                          <span className="text-[11px] font-bold text-auth-green ml-auto">10/10</span>
+                        </div>
+                      );
+                    }
+                    if (!isValid) {
+                      return <p className="text-[11px] text-auth-red mt-1.5">Enter a valid number with country code</p>;
+                    }
+                    return null;
+                  })()}
                   {isIndian && hasInput && (
                     <p className={`text-[12px] mt-1.5 ${isExactTen ? 'text-auth-green' : 'text-auth-text-3'}`}>
                       {digitCount} / 10 digits{isExactTen ? ' ✓' : ''}
