@@ -360,31 +360,51 @@ async function sendPDFDoc(phone: string, wardName: string, weekLabel: string, pd
   const authKey = Deno.env.get("MSG91_AUTH_KEY");
   if (!authKey || !pdfUrl) return;
 
-  const payload = {
-    integrated_number: INTEGRATED_NUMBER,
-    content_type: "document",
-    payload: {
-      messaging_product: "whatsapp",
-      type: "document",
-      to: phone,
-      document: {
-        link: pdfUrl,
-        caption: `Weekly Check-iN Report for ${wardName} — ${weekLabel}`,
-        filename: `CheckiN_Report_${wardName.replace(/\s+/g, "_")}_${weekLabel.replace(/[^a-zA-Z0-9]/g, "")}.pdf`,
+  const filename = `CheckiN_Report_${wardName.replace(/\s+/g, "_")}_${weekLabel.replace(/[^a-zA-Z0-9]/g, "")}.pdf`;
+  const caption = `Weekly Check-iN Report for ${wardName} — ${weekLabel}`;
+  const document = { link: pdfUrl, caption, filename };
+
+  // The bulk endpoint only accepts templates, so free-form media goes through
+  // the single outbound-message endpoint.
+  const attempts: { url: string; payload: unknown }[] = [
+    {
+      url: "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/",
+      payload: {
+        integrated_number: INTEGRATED_NUMBER,
+        recipient_number: phone,
+        content_type: "document",
+        attachment_url: pdfUrl,
+        filename,
+        text: caption,
       },
     },
-  };
+    {
+      url: "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/",
+      payload: {
+        integrated_number: INTEGRATED_NUMBER,
+        recipient_number: phone,
+        content_type: "attachment",
+        attachment_url: pdfUrl,
+        filename,
+        text: caption,
+      },
+    },
+  ];
+  void document;
 
-  try {
-    const res = await fetch(WA_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", authkey: authKey },
-      body: JSON.stringify(payload),
-    });
-    const text = await res.text();
-    console.log(`[wa-report] PDF doc (${res.status}):`, text.slice(0, 300));
-  } catch (err) {
-    console.error("[wa-report] PDF doc threw:", err);
+  for (const a of attempts) {
+    try {
+      const res = await fetch(a.url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", authkey: authKey },
+        body: JSON.stringify(a.payload),
+      });
+      const text = await res.text();
+      console.log(`[wa-report] PDF doc (${res.status}):`, text.slice(0, 300));
+      if (res.ok && !text.includes('"hasError": true') && !text.includes('"hasError":true')) return;
+    } catch (err) {
+      console.error("[wa-report] PDF doc threw:", err);
+    }
   }
 }
 
@@ -403,6 +423,8 @@ Deno.serve(async (req) => {
     const targetUserId = body.userId ?? null;
     // dryRun: build + upload the PDF but send no WhatsApp messages and write no log row
     const dryRun = body.dryRun === true;
+    // testPhone: send a real report to this number only (no log row, no idempotency skip)
+    const testPhone = body.testPhone ? normalizePhone(String(body.testPhone)) : null;
 
     if (triggeredBy === "cron") {
       const now = nowIST();
@@ -445,24 +467,27 @@ Deno.serve(async (req) => {
     const errors: string[] = [];
 
     for (const g of guardians as any[]) {
-      const phone = normalizePhone(g.guardian_phone);
+      const phone = testPhone || normalizePhone(g.guardian_phone);
       if (!phone) {
         errors.push(`${g.guardian_name}: cannot normalise phone ${g.guardian_phone}`);
         continue;
       }
 
       const idempotencyKey = `weekly-wa-report-${g.id}-${weekEnd.toISOString().slice(0, 10)}`;
-      const { data: alreadySent } = await supabase
-        .from("email_send_log")
-        .select("id")
-        .eq("template_name", "weekly-wa-report")
-        .filter("metadata->>idempotency_key", "eq", idempotencyKey)
-        .maybeSingle();
+      if (!testPhone) {
+        const { data: alreadySent } = await supabase
+          .from("email_send_log")
+          .select("id")
+          .eq("template_name", "weekly-wa-report")
+          .filter("metadata->>idempotency_key", "eq", idempotencyKey)
+          .maybeSingle();
 
-      if (alreadySent) {
-        console.log(`[wa-report] already sent for ${g.id} this week — skipping`);
-        continue;
+        if (alreadySent) {
+          console.log(`[wa-report] already sent for ${g.id} this week — skipping`);
+          continue;
+        }
       }
+
 
       try {
         const wardName = profileMap[g.user_id] || "Your ward";
@@ -512,6 +537,13 @@ Deno.serve(async (req) => {
           console.log(`[wa-report] dryRun ok for ${g.guardian_name} — pdf: ${pdfUrl ? "uploaded" : "failed"}`);
           continue;
         }
+
+        if (testPhone) {
+          sentCount++;
+          console.log(`[wa-report] test send to +${testPhone} done (no log row)`);
+          break;
+        }
+
 
         await supabase.from("email_send_log").insert({
           template_name: "weekly-wa-report",
