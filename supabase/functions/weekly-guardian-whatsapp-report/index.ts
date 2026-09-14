@@ -371,6 +371,7 @@ async function sendPDFDoc(phone: string, wardName: string, weekLabel: string, pd
       url: "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/",
       payload: {
         integrated_number: INTEGRATED_NUMBER,
+        recipient_number: phone,
         content_type: "media",
         payload: {
           messaging_product: "whatsapp",
@@ -384,6 +385,7 @@ async function sendPDFDoc(phone: string, wardName: string, weekLabel: string, pd
       url: "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/",
       payload: {
         integrated_number: INTEGRATED_NUMBER,
+        recipient_number: phone,
         content_type: "document",
         payload: {
           messaging_product: "whatsapp",
