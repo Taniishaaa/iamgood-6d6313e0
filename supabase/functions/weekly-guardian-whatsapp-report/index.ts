@@ -450,7 +450,8 @@ Deno.serve(async (req) => {
       const { data: alreadySent } = await supabase
         .from("email_send_log")
         .select("id")
-        .eq("idempotency_key", idempotencyKey)
+        .eq("template_name", "weekly-wa-report")
+        .filter("metadata->>idempotency_key", "eq", idempotencyKey)
         .maybeSingle();
 
       if (alreadySent) {
@@ -500,11 +501,10 @@ Deno.serve(async (req) => {
         }
 
         await supabase.from("email_send_log").insert({
-          idempotency_key: idempotencyKey,
           template_name: "weekly-wa-report",
           recipient_email: g.guardian_email || g.guardian_phone,
           status: "sent",
-          metadata: { guardian_id: g.id, ward_user_id: g.user_id, week_label: label, pdf_url: pdfUrl ?? null },
+          metadata: { idempotency_key: idempotencyKey, guardian_id: g.id, ward_user_id: g.user_id, week_label: label, pdf_url: pdfUrl ?? null },
         });
 
         sentCount++;
