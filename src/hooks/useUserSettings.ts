@@ -141,6 +141,7 @@ const DEFAULTS: UserSettings = {
   weeklyReport: true,
   medicationMissedNotify: true,
   checkInTimes: ["07:00", "12:00", "19:00"],
+  activeCheckInHours: [7, 12, 19],
   sleepMode: true,
   pauseMode: "active",
   defaultNapDurationMins: 60,
