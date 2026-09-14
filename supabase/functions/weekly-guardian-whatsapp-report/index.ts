@@ -447,24 +447,27 @@ Deno.serve(async (req) => {
     const errors: string[] = [];
 
     for (const g of guardians as any[]) {
-      const phone = normalizePhone(g.guardian_phone);
+      const phone = testPhone || normalizePhone(g.guardian_phone);
       if (!phone) {
         errors.push(`${g.guardian_name}: cannot normalise phone ${g.guardian_phone}`);
         continue;
       }
 
       const idempotencyKey = `weekly-wa-report-${g.id}-${weekEnd.toISOString().slice(0, 10)}`;
-      const { data: alreadySent } = await supabase
-        .from("email_send_log")
-        .select("id")
-        .eq("template_name", "weekly-wa-report")
-        .filter("metadata->>idempotency_key", "eq", idempotencyKey)
-        .maybeSingle();
+      if (!testPhone) {
+        const { data: alreadySent } = await supabase
+          .from("email_send_log")
+          .select("id")
+          .eq("template_name", "weekly-wa-report")
+          .filter("metadata->>idempotency_key", "eq", idempotencyKey)
+          .maybeSingle();
 
-      if (alreadySent) {
-        console.log(`[wa-report] already sent for ${g.id} this week — skipping`);
-        continue;
+        if (alreadySent) {
+          console.log(`[wa-report] already sent for ${g.id} this week — skipping`);
+          continue;
+        }
       }
+
 
       try {
         const wardName = profileMap[g.user_id] || "Your ward";
