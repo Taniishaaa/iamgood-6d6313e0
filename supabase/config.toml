@@ -65,5 +65,8 @@ project_id = "magnrdegcegxdtgapyez"
     verify_jwt = false
   [functions.firebase-auth]
     verify_jwt = false
+  [functions.weekly-guardian-whatsapp-report]
+    verify_jwt = false
+
 
 
