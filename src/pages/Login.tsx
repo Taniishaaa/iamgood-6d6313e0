@@ -211,11 +211,6 @@ const Login = () => {
                     }
                     return null;
                   })()}
-                  {isIndian && hasInput && (
-                    <p className={`text-[12px] mt-1.5 ${isExactTen ? 'text-auth-green' : 'text-auth-text-3'}`}>
-                      {digitCount} / 10 digits{isExactTen ? ' ✓' : ''}
-                    </p>
-                  )}
                 </div>
 
                 <div className="flex items-center gap-2 mt-1">
