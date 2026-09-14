@@ -398,6 +398,8 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const triggeredBy = String(body.triggeredBy || "cron");
     const targetUserId = body.userId ?? null;
+    // dryRun: build + upload the PDF but send no WhatsApp messages and write no log row
+    const dryRun = body.dryRun === true;
 
     if (triggeredBy === "cron") {
       const now = nowIST();
@@ -481,9 +483,11 @@ Deno.serve(async (req) => {
           ].join("  |  "),
         };
 
-        console.log(`[wa-report] → ${g.guardian_name} (+${phone}) for ${wardName}`);
-        const ok = await sendTemplateMsg(phone, vars);
-        if (!ok) throw new Error("Template message failed");
+        console.log(`[wa-report] → ${g.guardian_name} (+${phone}) for ${wardName}${dryRun ? " [dryRun]" : ""}`);
+        if (!dryRun) {
+          const ok = await sendTemplateMsg(phone, vars);
+          if (!ok) throw new Error("Template message failed");
+        }
 
         const pdfBytes = generatePDF({
           guardianName: g.guardian_name,
@@ -496,8 +500,14 @@ Deno.serve(async (req) => {
         const pdfUrl = await uploadPDF(supabase, pdfBytes, wardName, g.id, weekEnd);
         if (!pdfUrl) {
           console.warn(`[wa-report] PDF upload failed for ${g.guardian_name} — skipping document send`);
-        } else {
+        } else if (!dryRun) {
           await sendPDFDoc(phone, wardName, label, pdfUrl);
+        }
+
+        if (dryRun) {
+          sentCount++;
+          console.log(`[wa-report] dryRun ok for ${g.guardian_name} — pdf: ${pdfUrl ? "uploaded" : "failed"}`);
+          continue;
         }
 
         await supabase.from("email_send_log").insert({
