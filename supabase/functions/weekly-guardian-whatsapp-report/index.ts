@@ -360,31 +360,54 @@ async function sendPDFDoc(phone: string, wardName: string, weekLabel: string, pd
   const authKey = Deno.env.get("MSG91_AUTH_KEY");
   if (!authKey || !pdfUrl) return;
 
-  const payload = {
-    integrated_number: INTEGRATED_NUMBER,
-    content_type: "document",
-    payload: {
-      messaging_product: "whatsapp",
-      type: "document",
-      to: phone,
-      document: {
-        link: pdfUrl,
-        caption: `Weekly Check-iN Report for ${wardName} — ${weekLabel}`,
-        filename: `CheckiN_Report_${wardName.replace(/\s+/g, "_")}_${weekLabel.replace(/[^a-zA-Z0-9]/g, "")}.pdf`,
+  const filename = `CheckiN_Report_${wardName.replace(/\s+/g, "_")}_${weekLabel.replace(/[^a-zA-Z0-9]/g, "")}.pdf`;
+  const caption = `Weekly Check-iN Report for ${wardName} — ${weekLabel}`;
+  const document = { link: pdfUrl, caption, filename };
+
+  // The bulk endpoint only accepts templates, so free-form media goes through
+  // the single outbound-message endpoint.
+  const attempts: { url: string; payload: unknown }[] = [
+    {
+      url: "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/",
+      payload: {
+        integrated_number: INTEGRATED_NUMBER,
+        content_type: "media",
+        payload: {
+          messaging_product: "whatsapp",
+          to: phone,
+          type: "media",
+          media: { type: "document", ...document },
+        },
       },
     },
-  };
+    {
+      url: "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/",
+      payload: {
+        integrated_number: INTEGRATED_NUMBER,
+        content_type: "document",
+        payload: {
+          messaging_product: "whatsapp",
+          to: phone,
+          type: "document",
+          document,
+        },
+      },
+    },
+  ];
 
-  try {
-    const res = await fetch(WA_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", authkey: authKey },
-      body: JSON.stringify(payload),
-    });
-    const text = await res.text();
-    console.log(`[wa-report] PDF doc (${res.status}):`, text.slice(0, 300));
-  } catch (err) {
-    console.error("[wa-report] PDF doc threw:", err);
+  for (const a of attempts) {
+    try {
+      const res = await fetch(a.url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", authkey: authKey },
+        body: JSON.stringify(a.payload),
+      });
+      const text = await res.text();
+      console.log(`[wa-report] PDF doc (${res.status}):`, text.slice(0, 300));
+      if (res.ok && !text.includes('"hasError": true') && !text.includes('"hasError":true')) return;
+    } catch (err) {
+      console.error("[wa-report] PDF doc threw:", err);
+    }
   }
 }
 
