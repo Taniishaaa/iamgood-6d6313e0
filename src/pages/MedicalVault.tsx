@@ -31,7 +31,7 @@ import DoctorVisitReport from "@/components/health-tools/DoctorVisitReport";
 import VaultCategorisedSection from "@/components/vault/VaultCategorisedSection";
 import { useVaultReminderScheduler } from "@/hooks/useVaultReminderScheduler";
 
-const RECORD_TYPES = ["Visual Check", "Vaccination Record", "Doctor's Diagnosis", "Other"];
+const RECORD_TYPES = ["Visual Check", "Vaccination Record", "Doctor's Diagnosis", "Lab Report", "Other"];
 
 interface MedicalRecord {
   id: string;
