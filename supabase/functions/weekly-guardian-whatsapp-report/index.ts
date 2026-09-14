@@ -403,6 +403,8 @@ Deno.serve(async (req) => {
     const targetUserId = body.userId ?? null;
     // dryRun: build + upload the PDF but send no WhatsApp messages and write no log row
     const dryRun = body.dryRun === true;
+    // testPhone: send a real report to this number only (no log row, no idempotency skip)
+    const testPhone = body.testPhone ? normalizePhone(String(body.testPhone)) : null;
 
     if (triggeredBy === "cron") {
       const now = nowIST();
