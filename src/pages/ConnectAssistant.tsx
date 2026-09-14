@@ -9,8 +9,14 @@ import { toast } from "sonner";
 
 const APP_NAME = "Check-iN";
 const APP_SLUG = "check-in";
-const PROJECT_REF = import.meta.env.VITE_SUPABASE_PROJECT_ID as string;
-const MCP_URL = `https://${PROJECT_REF}.supabase.co/functions/v1/mcp`;
+const configuredSupabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+const supabaseUrl = new URL(configuredSupabaseUrl);
+const legacyLovableCloud =
+  supabaseUrl.hostname.endsWith(".lovable.cloud") && !supabaseUrl.hostname.startsWith("c--");
+const dataPlaneUrl = legacyLovableCloud
+  ? `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`
+  : supabaseUrl.toString().replace(/\/+$/, "");
+const MCP_URL = `${dataPlaneUrl}/functions/v1/mcp`;
 const CLAUDE_CODE_CMD = `claude mcp add --scope user --transport http ${APP_SLUG} '${MCP_URL}'`;
 
 function CopyBtn({ text, label = "Copy" }: { text: string; label?: string }) {
