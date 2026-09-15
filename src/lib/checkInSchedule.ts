@@ -43,22 +43,27 @@ export const getCheckInWindowStart = (hour: number, date: Date = new Date()) => 
   return d;
 };
 
-/** Returns the hour of the currently open check-in window, or null. */
+/** Returns the hour of the currently open check-in window, or null.
+ *  Mirrors the dashboard card: a window opens 60 minutes early and ends 60
+ *  minutes before the next slot (or at end of day for the last slot). */
 export const getCurrentWindow = (CHECK_IN_HOURS: number[]): number | null => {
-  const now = new Date();
-  const nowMs = now.getTime();
+  const nowMs = Date.now();
 
   for (const h of CHECK_IN_HOURS) {
+    const earlyStart = getCheckInWindowStart(h);
+    earlyStart.setMinutes(earlyStart.getMinutes() - 60);
+
     const windowStart = getCheckInWindowStart(h);
     const nextHourIndex = CHECK_IN_HOURS.indexOf(h) + 1;
-    let windowEnd: Date;
+    let windowEnd = new Date(windowStart);
     if (nextHourIndex < CHECK_IN_HOURS.length) {
       windowEnd = getCheckInWindowStart(CHECK_IN_HOURS[nextHourIndex]);
+      windowEnd.setMinutes(windowEnd.getMinutes() - 60);
     } else {
-      windowEnd = new Date(windowStart);
       windowEnd.setHours(23, 59, 59, 999);
     }
-    if (nowMs >= windowStart.getTime() && nowMs < windowEnd.getTime()) return h;
+
+    if (nowMs >= earlyStart.getTime() && nowMs < windowEnd.getTime()) return h;
   }
   return null;
 };
