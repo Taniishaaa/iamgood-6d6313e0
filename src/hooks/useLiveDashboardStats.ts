@@ -49,12 +49,15 @@ export function useLiveDashboardStats() {
           .maybeSingle()
       ]);
 
-      let ciCompleted = 0;
-      let ciTotal = 3; // Typically 3 slots a day
-      if (checkInsRes.data) {
-        ciTotal = Math.max(3, checkInsRes.data.length);
-        ciCompleted = checkInsRes.data.filter(c => c.status === "responded" || c.status === "late").length;
-      }
+      // Count only rows that line up with a scheduled slot — ad-hoc rows and
+      // slots from an older schedule must not inflate the total.
+      const scheduledRows = (checkInsRes.data ?? []).filter((c: any) =>
+        isScheduledSlot(c.scheduled_at, checkInHours)
+      );
+      const ciTotal = checkInHours.length;
+      const ciCompleted = scheduledRows.filter(
+        (c: any) => c.status === "responded" || c.status === "late"
+      ).length;
 
       // Total scheduled doses today = sum of schedule_times across active medications
       const activeMeds = (medsRes.data ?? []).filter((m: any) =>
