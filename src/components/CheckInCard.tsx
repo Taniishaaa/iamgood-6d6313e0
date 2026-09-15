@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import CheckInDialog from "@/components/CheckInDialog";
 import { useUserSettings } from "@/hooks/useUserSettings";
-import { isScheduledSlot } from "@/lib/checkInSchedule";
+import { isScheduledSlot, getCurrentWindow, getCheckInWindowStart } from "@/lib/checkInSchedule";
 
 const DEFAULT_CHECK_IN_HOURS = [7, 12, 19]; // 7AM, 12PM, 7PM
 
@@ -24,36 +24,7 @@ export const parseCheckInHours = (times?: string[] | null): number[] => {
   return hours.length > 0 ? hours : DEFAULT_CHECK_IN_HOURS;
 };
 
-const getCheckInWindowStart = (hour: number, date: Date = new Date()) => {
-  const d = new Date(date);
-  d.setHours(hour, 0, 0, 0);
-  return d;
-};
-
-const getCurrentWindow = (CHECK_IN_HOURS: number[]) => {
-  const now = new Date();
-  const nowMs = now.getTime();
-  
-  for (const h of CHECK_IN_HOURS) {
-    const earlyStart = getCheckInWindowStart(h);
-    earlyStart.setMinutes(earlyStart.getMinutes() - 60);
-
-    const windowStart = getCheckInWindowStart(h);
-    const nextHourIndex = CHECK_IN_HOURS.indexOf(h) + 1;
-    let windowEnd = new Date(windowStart);
-    if (nextHourIndex < CHECK_IN_HOURS.length) {
-      windowEnd = getCheckInWindowStart(CHECK_IN_HOURS[nextHourIndex]);
-      windowEnd.setMinutes(windowEnd.getMinutes() - 60);
-    } else {
-      windowEnd.setHours(23, 59, 59, 999);
-    }
-    
-    if (nowMs >= earlyStart.getTime() && nowMs < windowEnd.getTime()) {
-      return h;
-    }
-  }
-  return null;
-};
+// Window helpers live in @/lib/checkInSchedule so CheckInDialog uses identical logic
 
 const getNextCheckInTime = (CHECK_IN_HOURS: number[]) => {
   const now = new Date();
