@@ -3,6 +3,8 @@ import { X, Phone, Users, Stethoscope, Mic, MicOff, Volume2 } from "lucide-react
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { useUserSettings } from "@/hooks/useUserSettings";
+import { resolveCheckInHours, getCurrentWindow, getCheckInWindowStart } from "@/lib/checkInSchedule";
 
 type Step = "ask" | "well" | "not-well" | "voice";
 

@@ -354,9 +354,11 @@ const Settings = () => {
   const saveCheckInHours = (hours: number[]) => {
     const clean = [...new Set(hours.filter((h) => Number.isFinite(h) && h >= 0 && h <= 23))].sort((a, b) => a - b);
     if (clean.length === 0) return;
-    updateSetting("activeCheckInHours", clean);
-    // Keep the "HH:MM" list (used by the dashboard Check-in card) in sync
-    updateSetting("checkInTimes", clean.map((h) => `${String(h).padStart(2, "0")}:00`));
+    // Write both fields in a single patch so they can never diverge
+    updateSettings({
+      activeCheckInHours: clean,
+      checkInTimes: clean.map((h) => `${String(h).padStart(2, "0")}:00`),
+    });
   };
 
   // Guardians state
