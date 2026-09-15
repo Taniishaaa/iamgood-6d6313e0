@@ -74,8 +74,14 @@ export const getCurrentWindowHour = getCurrentWindow;
 /** The exact scheduled_at Date for a given hour today (minutes/seconds = 0). */
 export const getSlotTime = (hour: number): Date => getCheckInWindowStart(hour);
 
-/** True when a row's scheduled_at lines up exactly with one of the scheduled slots. */
+/**
+ * True when a row's scheduled_at lines up exactly with one of the scheduled slots.
+ * Checked in the device's LOCAL time (IST for Indian users), never UTC — a
+ * 7:00 AM IST slot is stored as 01:30:00+00, so a UTC minute check would
+ * wrongly reject every valid slot.
+ */
 export const isScheduledSlot = (scheduledAt: string, hours: number[]): boolean => {
   const d = new Date(scheduledAt);
-  return d.getMinutes() === 0 && d.getSeconds() === 0 && hours.includes(d.getHours());
+  if (d.getMinutes() !== 0 || d.getSeconds() !== 0 || d.getMilliseconds() !== 0) return false;
+  return hours.includes(d.getHours());
 };
