@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import CheckInDialog from "@/components/CheckInDialog";
 import { useUserSettings } from "@/hooks/useUserSettings";
+import { isScheduledSlot } from "@/lib/checkInSchedule";
 
 const DEFAULT_CHECK_IN_HOURS = [7, 12, 19]; // 7AM, 12PM, 7PM
 
