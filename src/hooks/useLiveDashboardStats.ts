@@ -2,9 +2,14 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { isMedScheduledToday } from "@/lib/medSchedule";
+import { useUserSettings } from "@/hooks/useUserSettings";
+import { resolveCheckInHours, isScheduledSlot } from "@/lib/checkInSchedule";
 
 export function useLiveDashboardStats() {
   const { session } = useAuth();
+  const { settings } = useUserSettings();
+  const checkInHours = resolveCheckInHours(settings);
+  const checkInHoursKey = checkInHours.join(",");
   const [stats, setStats] = useState({
     checkInsCompleted: 0,
     checkInsTotal: 0,
@@ -26,7 +31,7 @@ export function useLiveDashboardStats() {
       const [checkInsRes, medLogsRes, medsRes, healthRes] = await Promise.all([
         supabase
           .from("check_ins")
-          .select("status")
+          .select("status, scheduled_at")
           .eq("user_id", session.user.id)
           .gte("scheduled_at", todayDate.toISOString())
           .lt("scheduled_at", tomorrow.toISOString()),
@@ -49,12 +54,15 @@ export function useLiveDashboardStats() {
           .maybeSingle()
       ]);
 
-      let ciCompleted = 0;
-      let ciTotal = 3; // Typically 3 slots a day
-      if (checkInsRes.data) {
-        ciTotal = Math.max(3, checkInsRes.data.length);
-        ciCompleted = checkInsRes.data.filter(c => c.status === "responded" || c.status === "late").length;
-      }
+      // Count only rows that line up with a scheduled slot — ad-hoc rows and
+      // slots from an older schedule must not inflate the total.
+      const scheduledRows = (checkInsRes.data ?? []).filter((c: any) =>
+        isScheduledSlot(c.scheduled_at, checkInHours)
+      );
+      const ciTotal = checkInHours.length;
+      const ciCompleted = scheduledRows.filter(
+        (c: any) => c.status === "responded" || c.status === "late"
+      ).length;
 
       // Total scheduled doses today = sum of schedule_times across active medications
       const activeMeds = (medsRes.data ?? []).filter((m: any) =>
@@ -85,7 +93,7 @@ export function useLiveDashboardStats() {
     // Poll every minute to keep it fresh
     const interval = setInterval(fetchStats, 60000);
     return () => clearInterval(interval);
-  }, [session?.user?.id]);
+  }, [session?.user?.id, checkInHoursKey]);
 
   return stats;
 }

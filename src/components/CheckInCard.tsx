@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import CheckInDialog from "@/components/CheckInDialog";
 import { useUserSettings } from "@/hooks/useUserSettings";
+import { isScheduledSlot } from "@/lib/checkInSchedule";
 
 const DEFAULT_CHECK_IN_HOURS = [7, 12, 19]; // 7AM, 12PM, 7PM
 
@@ -221,13 +222,16 @@ const CheckInCard = () => {
 
     if (data) {
       const statuses: Record<number, string> = {};
+      // Only count rows that line up exactly with a scheduled slot — this
+      // excludes ad-hoc rows and slots left over from an older schedule.
       for (const ci of data) {
+        if (!isScheduledSlot(ci.scheduled_at, CHECK_IN_HOURS)) continue;
         const h = new Date(ci.scheduled_at).getHours();
         statuses[h] = ci.status;
       }
       setSlotStatuses(statuses);
     }
-  }, [session?.user?.id]);
+  }, [session?.user?.id, CHECK_IN_HOURS]);
 
   const prevWindowRef = useRef<number | null>(undefined);
 

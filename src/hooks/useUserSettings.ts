@@ -227,6 +227,23 @@ export function useUserSettings() {
     },
   });
 
+  // Apply several fields in one atomic patch so related settings never diverge
+  const updateSettings = useCallback(
+    (patch: Partial<UserSettings>) => {
+      const current = queryClient.getQueryData<UserSettings>(["user_settings", userId]) ?? DEFAULTS;
+      const updated = { ...current, ...patch };
+      queryClient.setQueryData(["user_settings", userId], updated);
+      if (_pendingTimeout) clearTimeout(_pendingTimeout);
+      _pendingMutate = () => mutation.mutate(updated);
+      _pendingTimeout = setTimeout(() => {
+        _pendingMutate?.();
+        _pendingMutate = undefined;
+        _pendingTimeout = undefined;
+      }, 500);
+    },
+    [userId, queryClient, mutation]
+  );
+
   const updateSetting = useCallback(
     <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => {
       const current = queryClient.getQueryData<UserSettings>(["user_settings", userId]) ?? DEFAULTS;
@@ -245,5 +262,5 @@ export function useUserSettings() {
     [userId, queryClient, mutation]
   );
 
-  return { settings, isLoading, updateSetting };
+  return { settings, isLoading, updateSetting, updateSettings };
 }
