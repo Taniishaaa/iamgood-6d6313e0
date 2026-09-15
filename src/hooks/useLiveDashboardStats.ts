@@ -2,9 +2,14 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { isMedScheduledToday } from "@/lib/medSchedule";
+import { useUserSettings } from "@/hooks/useUserSettings";
+import { resolveCheckInHours, isScheduledSlot } from "@/lib/checkInSchedule";
 
 export function useLiveDashboardStats() {
   const { session } = useAuth();
+  const { settings } = useUserSettings();
+  const checkInHours = resolveCheckInHours(settings);
+  const checkInHoursKey = checkInHours.join(",");
   const [stats, setStats] = useState({
     checkInsCompleted: 0,
     checkInsTotal: 0,
@@ -26,7 +31,7 @@ export function useLiveDashboardStats() {
       const [checkInsRes, medLogsRes, medsRes, healthRes] = await Promise.all([
         supabase
           .from("check_ins")
-          .select("status")
+          .select("status, scheduled_at")
           .eq("user_id", session.user.id)
           .gte("scheduled_at", todayDate.toISOString())
           .lt("scheduled_at", tomorrow.toISOString()),
@@ -88,7 +93,7 @@ export function useLiveDashboardStats() {
     // Poll every minute to keep it fresh
     const interval = setInterval(fetchStats, 60000);
     return () => clearInterval(interval);
-  }, [session?.user?.id]);
+  }, [session?.user?.id, checkInHoursKey]);
 
   return stats;
 }
