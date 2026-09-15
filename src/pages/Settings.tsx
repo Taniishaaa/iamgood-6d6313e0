@@ -345,7 +345,7 @@ const Settings = () => {
   const navigate = useNavigate();
   const { session } = useAuth();
 
-  const { settings, updateSetting } = useUserSettings();
+  const { settings, updateSetting, updateSettings } = useUserSettings();
 
   // Active-mode check-in hour helpers
   const formatCheckInHour = (h: number) =>
