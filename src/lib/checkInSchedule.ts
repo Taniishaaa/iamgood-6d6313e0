@@ -68,6 +68,12 @@ export const getCurrentWindow = (CHECK_IN_HOURS: number[]): number | null => {
   return null;
 };
 
+/** Alias: the currently active check-in window hour, or null. */
+export const getCurrentWindowHour = getCurrentWindow;
+
+/** The exact scheduled_at Date for a given hour today (minutes/seconds = 0). */
+export const getSlotTime = (hour: number): Date => getCheckInWindowStart(hour);
+
 /** True when a row's scheduled_at lines up exactly with one of the scheduled slots. */
 export const isScheduledSlot = (scheduledAt: string, hours: number[]): boolean => {
   const d = new Date(scheduledAt);
