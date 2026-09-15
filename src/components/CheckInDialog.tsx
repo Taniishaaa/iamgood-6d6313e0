@@ -23,6 +23,8 @@ interface CheckInDialogProps {
 
 const CheckInDialog = ({ open, onClose, onConfirmOk }: CheckInDialogProps) => {
   const { session } = useAuth();
+  const { settings } = useUserSettings();
+  const checkInHours = resolveCheckInHours(settings);
   const [step, setStep] = useState<Step>("ask");
   const [guardians, setGuardians] = useState<Guardian[]>([]);
   const [doctorName, setDoctorName] = useState<string | null>(null);
@@ -179,16 +181,23 @@ const CheckInDialog = ({ open, onClose, onConfirmOk }: CheckInDialogProps) => {
 
       setVoiceAnalysis(analysis);
 
-      // Save sentiment data to check-in
-      await supabase.from("check_ins").insert({
-        user_id: session.user.id,
-        scheduled_at: new Date().toISOString(),
-        status: "responded",
-        response: analysis.mood_score >= 6 ? "ok" : "not_ok",
-        responded_at: new Date().toISOString(),
-        notes: `Voice check-in: "${transcript.trim()}"`,
-        sentiment_data: analysis,
-      });
+      // Save sentiment data against the current scheduled slot (never now()),
+      // so a voice check-in updates the existing slot instead of adding a row.
+      const windowHour = getCurrentWindow(checkInHours);
+      const scheduledSlot = windowHour !== null ? getCheckInWindowStart(windowHour) : new Date();
+
+      await supabase.from("check_ins").upsert(
+        {
+          user_id: session.user.id,
+          scheduled_at: scheduledSlot.toISOString(),
+          status: "responded",
+          response: analysis.mood_score >= 6 ? "ok" : "not_ok",
+          responded_at: new Date().toISOString(),
+          notes: `Voice check-in: "${transcript.trim()}"`,
+          sentiment_data: analysis,
+        },
+        { onConflict: "user_id,scheduled_at", ignoreDuplicates: false }
+      );
 
       // If follow-up needed, notify guardians
       if (analysis.follow_up_needed) {

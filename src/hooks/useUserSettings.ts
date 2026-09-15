@@ -262,5 +262,5 @@ export function useUserSettings() {
     [userId, queryClient, mutation]
   );
 
-  return { settings, isLoading, updateSetting };
+  return { settings, isLoading, updateSetting, updateSettings };
 }

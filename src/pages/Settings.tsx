@@ -110,7 +110,7 @@ const GuardianChecklist = ({
 
 const PrivacyTab = ({ session, navigate, guardians: allGuardians }: { session: any; navigate: any; guardians: Guardian[] }) => {
   const queryClient = useQueryClient();
-  const { settings, updateSetting } = useUserSettings();
+  const { settings, updateSetting, updateSettings } = useUserSettings();
 
   const acceptedGuardians = useMemo(() => allGuardians.filter(g => g.status === "accepted"), [allGuardians]);
   const { data: requests = [], isLoading } = useQuery({
