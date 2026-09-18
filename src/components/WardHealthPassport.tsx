@@ -11,7 +11,6 @@ interface CategoryScore {
   max: 100;
 }
 
-const CHECK_IN_HOURS = [7, 12, 19];
 
 const getBarColor = (score: number) => {
   if (score >= 70) return "bg-success";
@@ -35,10 +34,8 @@ const WardHealthPassport = ({ wardUserId, wardName }: WardHealthPassportProps) =
 
   const computeScores = useCallback(async () => {
     const today = new Date().toISOString().slice(0, 10);
-    const now = new Date();
-    const currentHour = now.getHours();
 
-    const [checkInsRes, activityRes, medsRes, medLogsRes, mealsRes, personaRes] = await Promise.all([
+    const [checkInsRes, activityRes, medsRes, medLogsRes, mealsRes, personaRes, settingsRes] = await Promise.all([
       supabase.from("check_ins").select("scheduled_at, status, response").eq("user_id", wardUserId).gte("scheduled_at", `${today}T00:00:00`).lte("scheduled_at", `${today}T23:59:59`),
       supabase.from("activity_logs").select("steps, distance_km, calories, active_minutes").eq("user_id", wardUserId).eq("log_date", today).maybeSingle(),
       supabase.from("medications").select("id, schedule_times").eq("user_id", wardUserId).lte("start_date", today),
