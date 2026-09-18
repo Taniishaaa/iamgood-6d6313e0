@@ -42,15 +42,21 @@ const WardHealthPassport = ({ wardUserId, wardName }: WardHealthPassportProps) =
       supabase.from("medication_logs").select("medication_id, status").eq("user_id", wardUserId).gte("scheduled_at", `${today}T00:00:00`).lte("scheduled_at", `${today}T23:59:59`),
       supabase.from("meal_logs").select("total_calories, total_protein_g, total_fiber_g").eq("user_id", wardUserId).eq("log_date", today),
       supabase.from("nutrition_personas").select("daily_calorie_goal, weight_kg").eq("user_id", wardUserId).maybeSingle(),
+      supabase.from("user_settings").select("settings").eq("user_id", wardUserId).maybeSingle(),
     ]);
 
-    // 1. Check-iN
-    const checkIns = checkInsRes.data ?? [];
-    const passedWindows = CHECK_IN_HOURS.filter(h => currentHour >= h);
+    // 1. Check-iN — same source of truth as the Check-ins counter: only rows
+    // that land exactly on one of the ward's scheduled slots count.
+    const checkInHours = resolveCheckInHours((settingsRes.data?.settings ?? {}) as any);
+    const checkIns = (checkInsRes.data ?? []).filter((ci: any) =>
+      isScheduledSlot(ci.scheduled_at, checkInHours)
+    );
     let checkInScore = 0;
-    if (passedWindows.length > 0) {
-      const pointsPerWindow = 100 / 3;
-      const responded = checkIns.filter(ci => ci.status === "responded" || ci.response === "ok").length;
+    if (checkInHours.length > 0) {
+      const pointsPerWindow = 100 / checkInHours.length;
+      const responded = checkIns.filter(
+        (ci: any) => ci.status === "responded" || ci.status === "late"
+      ).length;
       checkInScore = Math.min(Math.round(responded * pointsPerWindow), 100);
     }
 
