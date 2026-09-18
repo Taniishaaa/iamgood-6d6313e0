@@ -55,8 +55,7 @@ const HealthPassport = () => {
     if (!user) return;
 
     const today = new Date().toISOString().slice(0, 10);
-    const now = new Date();
-    const currentHour = now.getHours();
+
 
 
     const [checkInsRes, activityRes, medsRes, medLogsRes, mealsRes, personaRes] = await Promise.all([
@@ -156,7 +155,8 @@ const HealthPassport = () => {
         break;
       }
     }
-  }, [user, goals]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, goals, checkInHoursKey]);
 
   useEffect(() => {
     computeScores();
