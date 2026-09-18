@@ -6,6 +6,7 @@ import { useUserSettings, DEFAULT_ACTIVITY_GOALS } from "@/hooks/useUserSettings
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import HealthPassportTrend from "./HealthPassportTrend";
+import { resolveCheckInHours, isScheduledSlot } from "@/lib/checkInSchedule";
 
 interface CategoryScore {
   name: string;
@@ -25,7 +26,6 @@ const MILESTONES: MilestoneConfig[] = [
   { threshold: 100, emoji: "🏆", message: "Perfect score! You're a health champion!" },
 ];
 
-const CHECK_IN_HOURS = [7, 12, 19];
 
 const getBarColor = (score: number) => {
   if (score >= 70) return "bg-success";
@@ -38,6 +38,8 @@ const HealthPassport = () => {
   const navigate = useNavigate();
   const { settings } = useUserSettings();
   const goals = settings.activityGoals ?? DEFAULT_ACTIVITY_GOALS;
+  const checkInHours = resolveCheckInHours(settings);
+  const checkInHoursKey = checkInHours.join(",");
   const [categories, setCategories] = useState<CategoryScore[]>([
     { name: "Check-iN", score: 0, max: 100 },
     { name: "Activity", score: 0, max: 100 },
@@ -53,8 +55,7 @@ const HealthPassport = () => {
     if (!user) return;
 
     const today = new Date().toISOString().slice(0, 10);
-    const now = new Date();
-    const currentHour = now.getHours();
+
 
 
     const [checkInsRes, activityRes, medsRes, medLogsRes, mealsRes, personaRes] = await Promise.all([
@@ -66,13 +67,18 @@ const HealthPassport = () => {
       supabase.from("nutrition_personas").select("daily_calorie_goal, weight_kg").eq("user_id", user.id).maybeSingle(),
     ]);
 
-    // 1. Check-iN score
-    const checkIns = checkInsRes.data ?? [];
-    const passedWindows = CHECK_IN_HOURS.filter(h => currentHour >= h);
+    // 1. Check-iN score — only rows that line up with a real scheduled slot
+    // count, exactly like the Check-ins counter. Ad-hoc/out-of-window rows
+    // must never award points.
+    const checkIns = (checkInsRes.data ?? []).filter((ci: any) =>
+      isScheduledSlot(ci.scheduled_at, checkInHours)
+    );
     let checkInScore = 0;
-    if (passedWindows.length > 0) {
-      const pointsPerWindow = 100 / 3;
-      const responded = checkIns.filter(ci => ci.status === "responded" || ci.response === "ok").length;
+    if (checkInHours.length > 0) {
+      const pointsPerWindow = 100 / checkInHours.length;
+      const responded = checkIns.filter(
+        (ci: any) => ci.status === "responded" || ci.status === "late"
+      ).length;
       checkInScore = Math.min(Math.round(responded * pointsPerWindow), 100);
     }
 
@@ -149,7 +155,8 @@ const HealthPassport = () => {
         break;
       }
     }
-  }, [user, goals]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, goals, checkInHoursKey]);
 
   useEffect(() => {
     computeScores();
