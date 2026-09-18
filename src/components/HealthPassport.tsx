@@ -38,6 +38,8 @@ const HealthPassport = () => {
   const navigate = useNavigate();
   const { settings } = useUserSettings();
   const goals = settings.activityGoals ?? DEFAULT_ACTIVITY_GOALS;
+  const checkInHours = resolveCheckInHours(settings);
+  const checkInHoursKey = checkInHours.join(",");
   const [categories, setCategories] = useState<CategoryScore[]>([
     { name: "Check-iN", score: 0, max: 100 },
     { name: "Activity", score: 0, max: 100 },
