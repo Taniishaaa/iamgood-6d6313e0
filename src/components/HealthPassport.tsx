@@ -6,6 +6,7 @@ import { useUserSettings, DEFAULT_ACTIVITY_GOALS } from "@/hooks/useUserSettings
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import HealthPassportTrend from "./HealthPassportTrend";
+import { resolveCheckInHours, isScheduledSlot } from "@/lib/checkInSchedule";
 
 interface CategoryScore {
   name: string;
@@ -25,7 +26,6 @@ const MILESTONES: MilestoneConfig[] = [
   { threshold: 100, emoji: "🏆", message: "Perfect score! You're a health champion!" },
 ];
 
-const CHECK_IN_HOURS = [7, 12, 19];
 
 const getBarColor = (score: number) => {
   if (score >= 70) return "bg-success";
