@@ -66,13 +66,18 @@ const HealthPassport = () => {
       supabase.from("nutrition_personas").select("daily_calorie_goal, weight_kg").eq("user_id", user.id).maybeSingle(),
     ]);
 
-    // 1. Check-iN score
-    const checkIns = checkInsRes.data ?? [];
-    const passedWindows = CHECK_IN_HOURS.filter(h => currentHour >= h);
+    // 1. Check-iN score — only rows that line up with a real scheduled slot
+    // count, exactly like the Check-ins counter. Ad-hoc/out-of-window rows
+    // must never award points.
+    const checkIns = (checkInsRes.data ?? []).filter((ci: any) =>
+      isScheduledSlot(ci.scheduled_at, checkInHours)
+    );
     let checkInScore = 0;
-    if (passedWindows.length > 0) {
-      const pointsPerWindow = 100 / 3;
-      const responded = checkIns.filter(ci => ci.status === "responded" || ci.response === "ok").length;
+    if (checkInHours.length > 0) {
+      const pointsPerWindow = 100 / checkInHours.length;
+      const responded = checkIns.filter(
+        (ci: any) => ci.status === "responded" || ci.status === "late"
+      ).length;
       checkInScore = Math.min(Math.round(responded * pointsPerWindow), 100);
     }
 
