@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { DEFAULT_ACTIVITY_GOALS } from "@/hooks/useUserSettings";
 import HealthPassportTrend from "./HealthPassportTrend";
+import { resolveCheckInHours, isScheduledSlot } from "@/lib/checkInSchedule";
 
 interface CategoryScore {
   name: string;
