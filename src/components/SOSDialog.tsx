@@ -658,15 +658,24 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
           })()}
 
           {/* Call buttons */}
-          <div className="flex gap-2 mb-4">
-            {medical.familyDoctorPhone && (
-              <a href={`tel:${medical.familyDoctorPhone}`} className="flex-1">
-                <Button className="w-full bg-success text-success-foreground gap-2">
-                  <Phone className="w-4 h-4" /> Call Doctor
-                </Button>
-              </a>
-            )}
-            <a href="tel:112" className={medical.familyDoctorPhone ? "flex-1" : "w-full"}>
+          <div className="flex flex-col gap-2 mb-4">
+            <div className="flex gap-2">
+              {guardians.find(g => g.is_primary) && (
+                <a href={`tel:${guardians.find(g => g.is_primary)?.guardian_phone}`} className="flex-1">
+                  <Button className="w-full bg-primary text-primary-foreground gap-2 h-12 text-base font-semibold">
+                    <Phone className="w-4 h-4" /> Call Primary Guardian
+                  </Button>
+                </a>
+              )}
+              {medical.familyDoctorPhone && (
+                <a href={`tel:${medical.familyDoctorPhone}`} className={guardians.find(g => g.is_primary) ? "flex-[0.5]" : "flex-1"}>
+                  <Button className="w-full bg-success text-success-foreground gap-2 h-12">
+                    <Phone className="w-4 h-4" /> Call Doctor
+                  </Button>
+                </a>
+              )}
+            </div>
+            <a href="tel:112" className="block w-full">
               <Button className="w-full bg-sos text-sos-foreground hover:bg-sos/90 h-12 text-base font-semibold gap-2">
                 <Phone className="w-5 h-5" /> Call 112
               </Button>
@@ -869,6 +878,17 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
               </p>
             </div>
 
+            {guardians.find(g => g.is_primary) && (
+              <div className="w-full pt-2">
+                <a href={`tel:${guardians.find(g => g.is_primary)?.guardian_phone}`} className="block w-full">
+                  <Button variant="outline" className="w-full h-14 text-base font-semibold border-primary/30 text-primary hover:bg-primary/10">
+                    <Phone className="w-5 h-5 mr-2" />
+                    Call Primary Guardian
+                  </Button>
+                </a>
+              </div>
+            )}
+
             <div className="w-full pt-4">
               <a href="tel:112" className="block w-full">
                 <Button variant="outline" className="w-full h-14 text-base font-semibold border-destructive/30 text-destructive hover:bg-destructive/10">
@@ -938,13 +958,23 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
           </Button>
         </div>
 
-        {/* Call 112 */}
-        <a href="tel:112" className="block mt-4">
-          <Button className="w-full bg-sos text-sos-foreground hover:bg-sos/90 h-14 text-lg font-semibold gap-2">
-            <Phone className="w-5 h-5" />
-            Call 112 Now
-          </Button>
-        </a>
+        {/* Call 112 / Primary Guardian */}
+        <div className="flex flex-col gap-2 mt-4">
+          {guardians.find(g => g.is_primary) && (
+            <a href={`tel:${guardians.find(g => g.is_primary)?.guardian_phone}`} className="block w-full">
+              <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-14 text-lg font-semibold gap-2">
+                <Phone className="w-5 h-5" />
+                Call Primary Guardian Now
+              </Button>
+            </a>
+          )}
+          <a href="tel:112" className="block w-full">
+            <Button className="w-full bg-sos text-sos-foreground hover:bg-sos/90 h-14 text-lg font-semibold gap-2">
+              <Phone className="w-5 h-5" />
+              Call 112 Now
+            </Button>
+          </a>
+        </div>
 
         {/* What will be sent */}
         <div className="mt-5 space-y-3">
