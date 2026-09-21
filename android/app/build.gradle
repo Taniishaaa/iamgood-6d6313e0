@@ -22,6 +22,7 @@ android {
             storePassword 'Futurewave123!'
             keyAlias 'upload-key'
             keyPassword 'Futurewave123!'
+            storeType 'PKCS12'
         }
     }
     buildTypes {
