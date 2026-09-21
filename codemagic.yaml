@@ -51,6 +51,8 @@ workflows:
     name: Android Play Store Build
     max_build_duration: 120
     environment:
+      groups:
+        - playstore
       node: latest
       java: 17
     triggering:
