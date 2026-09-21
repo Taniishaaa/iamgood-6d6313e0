@@ -54,7 +54,7 @@ workflows:
       groups:
         - playstore
       node: latest
-      java: 17
+      java: 21
     triggering:
       events:
         - push
