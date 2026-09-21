@@ -753,9 +753,6 @@ const Settings = () => {
                 <div className="space-y-2">
                   {(settings.activeCheckInHours ?? [7, 12, 19]).map((hour: number, idx: number) => (
                     <div key={idx} className="flex items-center gap-3">
-                      <div className="flex-1 bg-muted/50 rounded-lg px-3 py-2 text-sm font-medium">
-                        {formatCheckInHour(hour)}
-                      </div>
                       <Select
                         value={String(hour)}
                         onValueChange={(val) => {
@@ -764,7 +761,7 @@ const Settings = () => {
                           saveCheckInHours([...new Set(newHours)].sort((a, b) => a - b));
                         }}
                       >
-                        <SelectTrigger className="w-[140px]">
+                        <SelectTrigger className="flex-1">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

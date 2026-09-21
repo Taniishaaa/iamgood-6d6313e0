@@ -444,7 +444,7 @@ const CheckInCard = () => {
               Get ready for your next check-in at {formatHour(getNextCheckInTime(CHECK_IN_HOURS).getHours())}
             </p>
           </div>
-        ) : !checkedIn ? (
+        ) : !checkedIn && getCurrentWindow(CHECK_IN_HOURS) !== null ? (
           <div className="text-center space-y-3">
             <p className="text-3xl font-bold text-foreground">
               {userName}, did you Check-In today?
@@ -454,6 +454,7 @@ const CheckInCard = () => {
               disabled={loading}
               className="relative w-44 h-44 mx-auto flex items-center justify-center animate-pulse-heart disabled:opacity-50"
               aria-label="Check in - I'm okay"
+              aria-label="Check in"
               style={{
                 background: 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(0 84% 60% / 0.15) 60%, transparent 80%)',
               }}
@@ -464,7 +465,6 @@ const CheckInCard = () => {
               Tap the heart to Check-iN
             </p>
           </div>
-
         ) : (
           <div className="text-center py-4">
             <div className="w-24 h-24 rounded-full border-[3px] border-warning mx-auto flex flex-col items-center justify-center mb-4">
@@ -473,12 +473,14 @@ const CheckInCard = () => {
               </div>
               <div className="text-[11px] text-muted-foreground mt-1">Next check-in</div>
             </div>
-            <p className={`text-lg font-bold mb-1 ${checkedInStatus === "late" ? "text-warning" : "text-success"}`}>
-              {checkedInStatus === "late" ? "✓ Checked In (Late)" : "✓ Checked In!"}
+            <p className={`text-lg font-bold mb-1 ${checkedInStatus === "late" ? "text-warning" : checkedIn ? "text-success" : "text-foreground"}`}>
+              {checkedInStatus === "late" ? "✔ Checked In (Late)" : checkedIn ? "✔ Checked In!" : "Schedule Active"}
             </p>
-            <p className="text-sm text-muted-foreground">
-              Your guardians have been notified.
-            </p>
+            {checkedIn && (
+              <p className="text-sm text-muted-foreground">
+                Your guardians have been notified.
+              </p>
+            )}
           </div>
         )}
 
