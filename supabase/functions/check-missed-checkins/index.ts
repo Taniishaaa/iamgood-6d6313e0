@@ -670,6 +670,21 @@ Deno.serve(async (req) => {
           console.error("WhatsApp/SMS missed check-in send error:", waErr);
         }
 
+        // Trigger full auto-SOS for the missed check-in
+        try {
+          console.log(`[check-missed-checkins] Escalating missed check-in to full SOS for user ${checkIn.user_id}`);
+          const { error: sosError } = await supabase.from("sos_events").insert({
+            user_id: checkIn.user_id,
+            trigger_type: "auto",
+            status: "active",
+          });
+          if (sosError) {
+            console.error("[check-missed-checkins] Failed to trigger auto-SOS:", sosError);
+          }
+        } catch (sosErr) {
+          console.error("[check-missed-checkins] Exception triggering auto-SOS:", sosErr);
+        }
+
       }
     }
 
