@@ -259,7 +259,7 @@ const totalSteps = selectedRole === "guardian" ? TOTAL_STEPS_GUARDIAN : TOTAL_ST
       // Guardian: no account/success ceremony — straight into the dashboard.
       toast.success("You're verified — welcome to Check-iN");
       if (!isInstalled) {
-        setTimeout(() => toast("Tip: add Check-iN to your home screen for instant alerts."), 1500);
+        navigate("/guardian-install"); return;
       }
       navigate("/guardian");
       return;

@@ -50,7 +50,8 @@ const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Help = lazy(() => import("./pages/Help"));
 const GuardianSettings = lazy(() => import("./pages/GuardianSettings"));
 const GuardianHelp = lazy(() => import("./pages/GuardianHelp"));
-const Install = lazy(() => import("./pages/Install"));
+const Install = lazy(() => import('./pages/Install'));
+  const GuardianInstall = lazy(() => import('./pages/GuardianInstall'));
 const PublicJourneyView = lazy(() => import("./pages/PublicJourneyView"));
 const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
 const AdminCoupons = lazy(() => import("./pages/AdminCoupons"));
@@ -137,6 +138,7 @@ const App = () => (
                 <Route path="/e/:token" element={<EmergencyProfile />} />
                 <Route path="/j/:token" element={<PublicJourneyView />} />
                 <Route path="/install" element={<Install />} />
+                <Route path="/guardian-install" element={<GuardianInstall />} />
                 <Route path="/unsubscribe" element={<Unsubscribe />} />
                 <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
                 <Route path="/blog" element={<Blog />} />
