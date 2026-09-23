@@ -454,7 +454,6 @@ const CheckInCard = () => {
               disabled={loading}
               className="relative w-44 h-44 mx-auto flex items-center justify-center animate-pulse-heart disabled:opacity-50"
               aria-label="Check in - I'm okay"
-              aria-label="Check in"
               style={{
                 background: 'radial-gradient(circle, hsl(0 0% 100%) 30%, hsl(0 84% 60% / 0.15) 60%, transparent 80%)',
               }}
