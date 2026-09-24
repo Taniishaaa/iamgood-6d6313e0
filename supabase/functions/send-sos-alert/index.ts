@@ -494,19 +494,35 @@ Deno.serve(async (req) => {
     let whatsappRawResponse: any = null;
     const msg91AuthKey = Deno.env.get("MSG91_AUTH_KEY");
     const waTemplateName = "sos_alert_notification";
-    const namespace = "e67e5302_b6d0_403e_b3cc_8fa6e8accb01";
-    const langCode = "en_US";
+const namespace = "e67e5302_b6d0_403e_b3cc_8fa6e8accb01";
+const langCode = "en";
 
     if (msg91AuthKey && finalPhones.length) {
       const to_and_components = finalPhones.map((mobile) => ({
-        to: [mobile],
-        components: {
-          body_1: { type: "text", value: userNameSafe },
-          body_2: { type: "text", value: istTimestamp },
-          body_3: { type: "text", value: locationStr.slice(0, 200) },
-          body_4: { type: "text", value: healthSummary },
-        },
-      }));
+  to: [mobile],
+  components: {
+    body_var_1: {
+      type: "text",
+      value: userNameSafe,
+      parameter_name: "var_1",
+    },
+    body_var_2: {
+      type: "text",
+      value: istTimestamp,
+      parameter_name: "var_2",
+    },
+    body_var_3: {
+      type: "text",
+      value: locationStr.slice(0, 200),
+      parameter_name: "var_3",
+    },
+    body_var_4: {
+      type: "text",
+      value: healthSummary,
+      parameter_name: "var_4",
+    },
+  },
+}));
 
       const payload = {
         integrated_number: MSG91_INTEGRATED_NUMBER,
