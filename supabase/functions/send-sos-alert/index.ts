@@ -494,8 +494,8 @@ Deno.serve(async (req) => {
     let whatsappRawResponse: any = null;
     const msg91AuthKey = Deno.env.get("MSG91_AUTH_KEY");
     const waTemplateName = "sos_alert_notification";
-    const namespace = "e1e205a8_3b76_4c20_bde4_9f124a35c8c4";
-    const langCode = "en_US";
+    const namespace = "e67e5302_b6d0_403e_b3cc_8fa6e8accb01";
+    const langCode = "en";
 
     if (msg91AuthKey && finalPhones.length) {
       const to_and_components = finalPhones.map((mobile) => ({
