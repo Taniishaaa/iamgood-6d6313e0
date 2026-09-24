@@ -495,7 +495,7 @@ Deno.serve(async (req) => {
     const msg91AuthKey = Deno.env.get("MSG91_AUTH_KEY");
     const waTemplateName = "sos_alert_notification";
     const namespace = "e67e5302_b6d0_403e_b3cc_8fa6e8accb01";
-    const langCode = "en";
+    const langCode = "en_US";
 
     if (msg91AuthKey && finalPhones.length) {
       const to_and_components = finalPhones.map((mobile) => ({
