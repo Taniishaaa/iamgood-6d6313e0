@@ -10,6 +10,7 @@ export type PauseMode = "active" | "sleep" | "nap" | "checked-out";
 
 export type SOSRecipientChannelStatus = "accepted" | "rejected" | "not_attempted";
 export type SOSRecipientSkipReason = "self_targeted" | "invalid_phone" | "duplicate_phone";
+
 export interface SOSRecipientReport {
   guardian_id: string;
   name: string;
@@ -19,32 +20,33 @@ export interface SOSRecipientReport {
   included: boolean;
   skip_reason: SOSRecipientSkipReason | null;
   channels: {
-    whatsapp: SOSRecipientChannelStatus;
-    sms: SOSRecipientChannelStatus;
+    oneapi: SOSRecipientChannelStatus;
   };
 }
 
 export interface SOSDeliveryResult {
   recipientCount: number;
+
   // "Accepted" = provider (MSG91) took the request; delivery is still pending
   // until the delivery-status webhook updates `sos_message_attempts`.
-  whatsappAccepted: number;
-  smsAccepted: number;
-  // Legacy aliases (same values as above) — kept so older UI keeps working.
-  whatsappQueued: number;
-  smsQueued: number;
-  whatsappRequestId?: string | null;
-  smsRequestId?: string | null;
+  oneApiAccepted: number;
+
+  // Legacy aliases are no longer used because WhatsApp/SMS
+  // are now handled together through MSG91 OneAPI.
+  oneApiQueued: number;
+
+  oneApiRequestId?: string | null;
+
   emailQueued?: number;
   pushSent?: number;
   deliveryPending?: boolean;
-  selfTargetedPhones?: string[];
+
   recipients?: SOSRecipientReport[];
+
   errors: {
     invoke: string | null;
     recipients: string | null;
-    whatsapp: string | null;
-    sms: string | null;
+    oneApi: string | null;
   };
 }
 
@@ -89,6 +91,7 @@ const getCurrentPosition = (): Promise<{ latitude: number; longitude: number } |
       resolve(null);
       return;
     }
+
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
       () => resolve(null),
@@ -112,169 +115,257 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (pauseHydratedRef.current) return;
     if (!session?.user?.id) return;
     if (settingsLoading) return;
+
     pauseHydratedRef.current = true;
+
     if (settings.pauseMode === "checked-out") {
       const endsAt = settings.checkOutConfig?.endsAt;
+
       if (endsAt && new Date(endsAt).getTime() > Date.now()) {
         setPauseMode("checked-out");
       }
     }
+
     // sleep mode is re-asserted by useAutoSleepMode based on schedule
-  }, [session?.user?.id, settingsLoading, settings.pauseMode, settings.checkOutConfig]);
+  }, [
+    session?.user?.id,
+    settingsLoading,
+    settings.pauseMode,
+    settings.checkOutConfig,
+  ]);
 
   const invokedSosIdsRef = React.useRef<Set<string>>(new Set());
 
   const isLoggedIn = !!session;
   const userName = profile?.full_name || "User";
-  const role: UserRole = roleOverride ?? ((profile?.role === "guardian" ? "guardian" : "user") as UserRole);
+  const role: UserRole =
+    roleOverride ??
+    ((profile?.role === "guardian" ? "guardian" : "user") as UserRole);
 
   const setRole = useCallback((r: UserRole) => setRoleOverride(r), []);
 
-  const invokeSosAlertOnce = useCallback(async (
-    sosId: string,
-    opts?: TriggerSOSOptions
-  ): Promise<{ delivery: SOSDeliveryResult | null; invokeError: string | null }> => {
-    if (invokedSosIdsRef.current.has(sosId)) {
-      console.log("[triggerSOS] skipping duplicate invoke for sosId:", sosId);
-      return { delivery: null, invokeError: null };
-    }
-    invokedSosIdsRef.current.add(sosId);
-    if (!session?.user?.id) {
-      return { delivery: null, invokeError: "no-session" };
-    }
+  const invokeSosAlertOnce = useCallback(
+    async (
+      sosId: string,
+      opts?: TriggerSOSOptions
+    ): Promise<{
+      delivery: SOSDeliveryResult | null;
+      invokeError: string | null;
+    }> => {
+      if (invokedSosIdsRef.current.has(sosId)) {
+        console.log("[triggerSOS] skipping duplicate invoke for sosId:", sosId);
+        return { delivery: null, invokeError: null };
+      }
 
-    const currentUserName = opts?.userName || profile?.full_name || "User";
+      invokedSosIdsRef.current.add(sosId);
 
-    // Always resolve recipients from accepted guardians only — backend is source of truth
-    const { data: guardianRows } = await supabase
-      .from("guardians")
-      .select("guardian_email, guardian_phone")
-      .eq("user_id", session.user.id)
-      .eq("status", "accepted");
+      if (!session?.user?.id) {
+        return { delivery: null, invokeError: "no-session" };
+      }
 
-    const guardian_emails = (guardianRows ?? []).map((g: any) => g.guardian_email).filter(Boolean);
-    const guardian_phones = (guardianRows ?? []).map((g: any) => g.guardian_phone).filter(Boolean);
+      const currentUserName = opts?.userName || profile?.full_name || "User";
 
-    const messageText = opts?.message || `🚨 SOS ALERT from ${currentUserName} — immediate attention needed.`;
+      // Always resolve recipients from accepted guardians only — backend is source of truth
+      const { data: guardianRows } = await supabase
+        .from("guardians")
+        .select("guardian_email, guardian_phone")
+        .eq("user_id", session.user.id)
+        .eq("status", "accepted");
 
-    console.log("[triggerSOS] invoking send-sos-alert", {
-      sosId,
-      acceptedGuardians: guardianRows?.length ?? 0,
-      phones: guardian_phones.length,
-      emails: guardian_emails.length,
-    });
+      const guardian_emails = (guardianRows ?? [])
+        .map((g: any) => g.guardian_email)
+        .filter(Boolean);
 
-    try {
-      const { data, error } = await supabase.functions.invoke("send-sos-alert", {
-        body: {
-          user_id: session.user.id,
-          message: messageText,
-          guardian_emails,
-          guardian_phones,
-          doctor_email: opts?.doctorEmail ?? null,
-          doctor_name: opts?.doctorName ?? null,
-          user_name: currentUserName,
-        },
+      const guardian_phones = (guardianRows ?? [])
+        .map((g: any) => g.guardian_phone)
+        .filter(Boolean);
+
+      const messageText =
+        opts?.message ||
+        `🚨 SOS ALERT from ${currentUserName} — immediate attention needed.`;
+
+      console.log("[triggerSOS] invoking send-sos-alert", {
+        sosId,
+        acceptedGuardians: guardianRows?.length ?? 0,
+        phones: guardian_phones.length,
+        emails: guardian_emails.length,
       });
 
-      if (error) {
-        // Non-fatal: the DB trigger on sos_events will dispatch server-side.
-        console.warn("[triggerSOS] client invoke failed; server trigger will handle dispatch:", error);
-        return { delivery: null, invokeError: error.message || "invoke failed" };
+      try {
+        const { data, error } = await supabase.functions.invoke(
+          "send-sos-alert",
+          {
+            body: {
+              user_id: session.user.id,
+              message: messageText,
+              guardian_emails,
+              guardian_phones,
+              doctor_email: opts?.doctorEmail ?? null,
+              doctor_name: opts?.doctorName ?? null,
+              user_name: currentUserName,
+            },
+          }
+        );
+
+        if (error) {
+          // Non-fatal: the DB trigger on sos_events will dispatch server-side.
+          console.warn(
+            "[triggerSOS] client invoke failed; server trigger will handle dispatch:",
+            error
+          );
+
+          return {
+            delivery: null,
+            invokeError: error.message || "invoke failed",
+          };
+        }
+
+        console.log("[triggerSOS] send-sos-alert response:", data);
+
+        const d = data as any;
+
+        const oneApiAccepted = d?.oneApiAccepted ?? 0;
+
+        const delivery: SOSDeliveryResult = {
+          recipientCount: d?.recipientCount ?? 0,
+
+          oneApiAccepted,
+          oneApiQueued: oneApiAccepted,
+
+          oneApiRequestId: d?.oneApiRequestId ?? null,
+
+          emailQueued: d?.emailQueued ?? 0,
+          pushSent: d?.pushSent ?? 0,
+          deliveryPending: !!d?.deliveryPending,
+
+          recipients: Array.isArray(d?.recipients)
+            ? d.recipients
+            : undefined,
+
+          errors: {
+            invoke: null,
+            recipients: d?.errors?.recipients ?? null,
+            oneApi: d?.errors?.oneApi ?? null,
+          },
+        };
+
+        if (delivery.recipientCount === 0) {
+          toast.error(
+            delivery.errors.recipients ||
+              "No accepted guardians with valid phone numbers"
+          );
+        } else if (oneApiAccepted === 0) {
+          toast.error(
+            `SOS not accepted by provider. OneAPI: ${
+              delivery.errors.oneApi || "n/a"
+            }`
+          );
+        }
+
+        return { delivery, invokeError: null };
+      } catch (e: any) {
+        // Non-fatal: DB trigger dispatches server-side regardless.
+        console.warn(
+          "[triggerSOS] client invoke threw; server trigger will handle dispatch:",
+          e
+        );
+
+        const msg = e?.message || String(e);
+
+        return {
+          delivery: null,
+          invokeError: msg,
+        };
+      }
+    },
+    [session?.user?.id, profile?.full_name]
+  );
+
+  const triggerSOS = useCallback(
+    async (opts?: TriggerSOSOptions): Promise<TriggerSOSResult> => {
+      setEmergencyMode(true);
+
+      if (!session?.user?.id) {
+        toast.error("You must be logged in to trigger SOS");
+
+        return {
+          sosId: null,
+          delivery: null,
+          invokeError: "no-session",
+        };
       }
 
-      console.log("[triggerSOS] send-sos-alert response:", data);
-      const d = data as any;
-      const waAccepted = d?.whatsappAccepted ?? d?.whatsappQueued ?? 0;
-      const smsAccepted = d?.smsAccepted ?? d?.smsQueued ?? 0;
-      const delivery: SOSDeliveryResult = {
-        recipientCount: d?.recipientCount ?? 0,
-        whatsappAccepted: waAccepted,
-        smsAccepted: smsAccepted,
-        whatsappQueued: waAccepted,
-        smsQueued: smsAccepted,
-        whatsappRequestId: d?.whatsappRequestId ?? null,
-        smsRequestId: d?.smsRequestId ?? null,
-        emailQueued: d?.emailQueued ?? 0,
-        pushSent: d?.pushSent ?? 0,
-        deliveryPending: !!d?.deliveryPending,
-        selfTargetedPhones: Array.isArray(d?.selfTargetedPhones) ? d.selfTargetedPhones : [],
-        recipients: Array.isArray(d?.recipients) ? d.recipients : undefined,
-        errors: {
-          invoke: null,
-          recipients: d?.errors?.recipients ?? null,
-          whatsapp: d?.errors?.whatsapp ?? null,
-          sms: d?.errors?.sms ?? null,
-        },
+      const coords = await getCurrentPosition();
+
+      if (!coords) {
+        toast.warning("Location unavailable — SOS sent without coordinates");
+      }
+
+      const sosPayload = {
+        user_id: session.user.id,
+        latitude: coords?.latitude ?? null,
+        longitude: coords?.longitude ?? null,
+        trigger_type: "manual",
+        status: "active",
       };
 
-      if (delivery.recipientCount === 0) {
-        toast.error(delivery.errors.recipients || "No accepted guardians with valid phone numbers");
-      } else if (waAccepted === 0 && smsAccepted === 0) {
-        toast.error(`SOS not accepted by provider. WhatsApp: ${delivery.errors.whatsapp || "n/a"} | SMS: ${delivery.errors.sms || "n/a"}`);
-      }
-
-      return { delivery, invokeError: null };
-    } catch (e: any) {
-      // Non-fatal: DB trigger dispatches server-side regardless.
-      console.warn("[triggerSOS] client invoke threw; server trigger will handle dispatch:", e);
-      const msg = e?.message || String(e);
-      return { delivery: null, invokeError: msg };
-    }
-  }, [session?.user?.id, profile?.full_name]);
-
-  const triggerSOS = useCallback(async (opts?: TriggerSOSOptions): Promise<TriggerSOSResult> => {
-    setEmergencyMode(true);
-
-    if (!session?.user?.id) {
-      toast.error("You must be logged in to trigger SOS");
-      return { sosId: null, delivery: null, invokeError: "no-session" };
-    }
-
-    const coords = await getCurrentPosition();
-    if (!coords) {
-      toast.warning("Location unavailable — SOS sent without coordinates");
-    }
-
-    const sosPayload = {
-      user_id: session.user.id,
-      latitude: coords?.latitude ?? null,
-      longitude: coords?.longitude ?? null,
-      trigger_type: "manual",
-      status: "active",
-    };
-
-    try {
-      const { data, error } = await supabase
-        .from("sos_events")
-        .insert(sosPayload)
-        .select("id")
-        .single();
-
-      if (error) throw error;
-      if (!data) {
-        return { sosId: null, delivery: null, invokeError: "no-sos-id" };
-      }
-
-      setActiveSosId(data.id);
-      const result = await invokeSosAlertOnce(data.id, opts);
-      return { sosId: data.id, delivery: result.delivery, invokeError: result.invokeError };
-    } catch (err: any) {
-      console.error("Failed to create SOS event (may be offline):", err);
       try {
-        await queueSOS(sosPayload);
-        toast.warning("You're offline — SOS queued and will send when reconnected");
-        if ("serviceWorker" in navigator && "SyncManager" in window) {
-          const reg = await navigator.serviceWorker.ready;
-          await (reg as any).sync.register("sos-sync");
+        const { data, error } = await supabase
+          .from("sos_events")
+          .insert(sosPayload)
+          .select("id")
+          .single();
+
+        if (error) throw error;
+
+        if (!data) {
+          return {
+            sosId: null,
+            delivery: null,
+            invokeError: "no-sos-id",
+          };
         }
-      } catch (queueErr) {
-        console.error("Failed to queue SOS:", queueErr);
-        toast.error("Failed to record SOS event");
+
+        setActiveSosId(data.id);
+
+        const result = await invokeSosAlertOnce(data.id, opts);
+
+        return {
+          sosId: data.id,
+          delivery: result.delivery,
+          invokeError: result.invokeError,
+        };
+      } catch (err: any) {
+        console.error(
+          "Failed to create SOS event (may be offline):",
+          err
+        );
+
+        try {
+          await queueSOS(sosPayload);
+
+          toast.warning(
+            "You're offline — SOS queued and will send when reconnected"
+          );
+
+          if ("serviceWorker" in navigator && "SyncManager" in window) {
+            const reg = await navigator.serviceWorker.ready;
+            await (reg as any).sync.register("sos-sync");
+          }
+        } catch (queueErr) {
+          console.error("Failed to queue SOS:", queueErr);
+          toast.error("Failed to record SOS event");
+        }
+
+        return {
+          sosId: null,
+          delivery: null,
+          invokeError: err?.message || String(err),
+        };
       }
-      return { sosId: null, delivery: null, invokeError: err?.message || String(err) };
-    }
-  }, [session?.user?.id, invokeSosAlertOnce]);
+    },
+    [session?.user?.id, invokeSosAlertOnce]
+  );
 
   const cancelSOS = useCallback(async () => {
     setEmergencyMode(false);
@@ -283,12 +374,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const { error } = await supabase
       .from("sos_events")
-      .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+      .update({
+        status: "cancelled",
+        cancelled_at: new Date().toISOString(),
+      })
       .eq("id", activeSosId);
 
     if (error) {
       console.error("Failed to cancel SOS event:", error);
     }
+
     setActiveSosId(null);
 
     // Notify guardians that user is safe
@@ -310,24 +405,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           message: `${currentUserName} has marked themselves as safe. The SOS alert has been cancelled.`,
           type: "sos_resolved",
         }));
-        await supabase.rpc("insert_notifications_deduped", { p_notifications: notifRows });
+
+        await supabase.rpc("insert_notifications_deduped", {
+          p_notifications: notifRows,
+        });
 
         // Send "all clear" via edge function (email/push/WhatsApp)
-        const guardianEmails = guardianRows.map((g: any) => g.guardian_email).filter(Boolean);
-        supabase.functions.invoke("send-sos-alert", {
-          body: {
-            user_id: session.user.id,
-            message: `✅ ALL CLEAR — ${currentUserName} has confirmed they are safe. The SOS alert has been cancelled.`,
-            guardian_emails: guardianEmails,
-            user_name: currentUserName,
-          },
-        }).catch((e) => console.error("Failed to send all-clear:", e));
+        const guardianEmails = guardianRows
+          .map((g: any) => g.guardian_email)
+          .filter(Boolean);
+
+        supabase
+          .functions
+          .invoke("send-sos-alert", {
+            body: {
+              user_id: session.user.id,
+              message: `✅ ALL CLEAR — ${currentUserName} has confirmed they are safe. The SOS alert has been cancelled.`,
+              guardian_emails: guardianEmails,
+              user_name: currentUserName,
+            },
+          })
+          .catch((e) => console.error("Failed to send all-clear:", e));
       }
     }
   }, [activeSosId, session, profile]);
 
   return (
-    <AppContext.Provider value={{ role, setRole, isLoggedIn, loginInProgress, emergencyMode, activeSosId, triggerSOS, cancelSOS, userName, pauseMode, setPauseMode }}>
+    <AppContext.Provider
+      value={{
+        role,
+        setRole,
+        isLoggedIn,
+        loginInProgress,
+        emergencyMode,
+        activeSosId,
+        triggerSOS,
+        cancelSOS,
+        userName,
+        pauseMode,
+        setPauseMode,
+      }}
+    >
       {children}
     </AppContext.Provider>
   );
