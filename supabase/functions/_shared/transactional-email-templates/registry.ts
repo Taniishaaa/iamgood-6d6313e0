@@ -40,4 +40,5 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   "email-health-alert": emailHealthAlert,
   // ── NEW ──
   "weekly-guardian-report": weeklyGuardianReport,
+  "password-reset": passwordReset,
 };
