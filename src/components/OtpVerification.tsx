@@ -12,12 +12,21 @@ declare global {
   }
 }
 
+/** What the sign-in service reports back once a code has been accepted. */
+export interface OtpPayload {
+  token_hash?: string;
+  email?: string;
+  no_account?: boolean;
+  blocked?: boolean;
+  error?: string;
+}
+
 interface OtpVerificationProps {
   phone: string;
   purpose?: "login" | "register";
   /** Guardian invite token â€” server rejects sends to a number the ward did not invite. */
   nominationToken?: string | null;
-  onVerified: (data?: { token_hash?: string; email?: string; no_account?: boolean }) => void;
+  onVerified: (data?: OtpPayload) => void;
   onCancel: () => void;
 }
 

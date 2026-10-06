@@ -8,6 +8,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 
 import OtpVerification from "@/components/OtpVerification";
+
+/** Shape of the sign-in service's reply once a code has been accepted. */
+type OtpResult = {
+  token_hash?: string;
+  email?: string;
+  no_account?: boolean;
+  blocked?: boolean;
+  error?: string;
+};
 import PhoneInput from "@/components/PhoneInput";
 import { isValidE164, toE164 } from "@/lib/countryCodes";
 import { useSeoMeta } from "@/components/SeoMeta";
@@ -247,7 +256,14 @@ const Login = () => {
               </div>
               <OtpVerification
                 phone={otpPhone}
-                onVerified={async (data) => {
+                onVerified={async (data: OtpResult | undefined) => {
+                  if (data?.blocked) {
+                    toast.error("Account blocked", {
+                      description: data?.error || "Please contact Check-iN support.",
+                    });
+                    setOtpPhone("");
+                    return;
+                  }
                   if (data?.no_account) {
                     toast.error("No account found", { description: "Please register first." });
                     setOtpPhone("");

@@ -1958,6 +1958,8 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          blocked_at: string | null
+          blocked_reason: string | null
           blood_group: string | null
           created_at: string
           date_of_birth: string | null
@@ -1978,6 +1980,8 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          blocked_at?: string | null
+          blocked_reason?: string | null
           blood_group?: string | null
           created_at?: string
           date_of_birth?: string | null
@@ -1998,6 +2002,8 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          blocked_at?: string | null
+          blocked_reason?: string | null
           blood_group?: string | null
           created_at?: string
           date_of_birth?: string | null
