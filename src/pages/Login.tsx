@@ -248,6 +248,13 @@ const Login = () => {
               <OtpVerification
                 phone={otpPhone}
                 onVerified={async (data) => {
+                  if (data?.blocked) {
+                    toast.error("Account blocked", {
+                      description: data?.error || "Please contact Check-iN support.",
+                    });
+                    setOtpPhone("");
+                    return;
+                  }
                   if (data?.no_account) {
                     toast.error("No account found", { description: "Please register first." });
                     setOtpPhone("");

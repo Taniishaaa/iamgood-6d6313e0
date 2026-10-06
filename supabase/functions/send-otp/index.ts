@@ -323,6 +323,23 @@ Deno.serve(async (req) => {
           return jsonResponse({ success: true, verified: true, no_account: true });
         }
 
+        // An administrator-blocked account cannot start a new session.
+        const { data: accessRow } = await admin
+          .from("profiles")
+          .select("blocked_at, blocked_reason")
+          .eq("phone", phoneWithPlus)
+          .limit(1)
+          .maybeSingle();
+        if (accessRow?.blocked_at) {
+          await logOtpEvent(admin, phone, "verify_blocked", undefined, "failed", "Account blocked");
+          return jsonResponse({
+            success: true,
+            verified: true,
+            blocked: true,
+            error: "This account has been blocked from signing in. Please contact Check-iN support.",
+          });
+        }
+
         const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
           type: "magiclink",
           email: email as string,
