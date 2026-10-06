@@ -23,6 +23,7 @@ import { template as admin2faCode } from "./admin-2fa-code.tsx";
 import { template as emailHealthAlert } from "./email-health-alert.tsx";
 // ── NEW ──
 import { template as weeklyGuardianReport } from "./weekly-guardian-report.tsx";
+import { template as passwordReset } from "./password-reset.tsx";
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   "contact-confirmation": contactConfirmation,
