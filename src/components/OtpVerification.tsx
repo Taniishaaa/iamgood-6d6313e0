@@ -17,7 +17,13 @@ interface OtpVerificationProps {
   purpose?: "login" | "register";
   /** Guardian invite token â€” server rejects sends to a number the ward did not invite. */
   nominationToken?: string | null;
-  onVerified: (data?: { token_hash?: string; email?: string; no_account?: boolean }) => void;
+  onVerified: (data?: {
+    token_hash?: string;
+    email?: string;
+    no_account?: boolean;
+    blocked?: boolean;
+    error?: string;
+  }) => void;
   onCancel: () => void;
 }
 
