@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
 
   const when = stage === "1_hour" ? "in 1 hour (12:00 PM today)" : `on ${fmt(purgeDate)}`;
   const title = stage === "1_hour" ? "Vitals data deleting in 1 hour" : "Vitals data will be deleted soon";
-  const message = `Vitals data older than a month (before ${fmt(cutoff)}) will be deleted ${when}. Save a "Your Health Vitals" report to your Vault, or keep all data with Extra Storage for ₹99/month from the Subscription page.`;
+  const message = `Vitals data older than a month (before ${fmt(cutoff)}) will be deleted ${when}. Save a "Your Health Vitals" report to your Vault before it's removed.`;
 
   let sent = 0, pushes = 0, guardianNotices = 0;
   for (const uid of users) {
@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
     });
     pushes += await pushToUser(sb, uid, {
       title, body: message, tag: `vitals-retention-${purgeDate}-${stage}`,
-      url: "/subscription#vitals-storage", type: "vitals_retention", user_id: uid,
+      url: "/", type: "vitals_retention", user_id: uid,
     });
 
     // Guardians
@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
     ]);
     const name = prof?.full_name || "Your ward";
     const gTitle = stage === "1_hour" ? `${name}'s vitals deleting in 1 hour` : `${name}'s vitals will be deleted soon`;
-    const gMsg = `${name}'s vitals older than a month (before ${fmt(cutoff)}) will be deleted ${when}. Save a "Your Health Vitals" report or ask them to add Extra Storage (₹99/month).`;
+    const gMsg = `${name}'s vitals older than a month (before ${fmt(cutoff)}) will be deleted ${when}. Ask them to save a "Your Health Vitals" report before it's removed.`;
     for (const g of gs || []) {
       await sb.from("notifications").insert({ user_id: uid, guardian_id: g.id, title: gTitle, message: gMsg, type: "vitals_retention" });
       guardianNotices++;
