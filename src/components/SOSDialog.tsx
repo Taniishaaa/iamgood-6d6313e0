@@ -281,7 +281,6 @@ const SOSDialog = ({ open, onClose, isPracticeMode = false }: SOSDialogProps) =>
         status: "success",
         title: "Practice Mode Complete",
         detail: "This was a test run. Your guardians were NOT notified and emergency services were NOT contacted.",
-        selfTargetedPhones: [],
       });
       return;
     }
@@ -308,7 +307,6 @@ const SOSDialog = ({ open, onClose, isPracticeMode = false }: SOSDialogProps) =>
           status: "failed",
           title: "SOS could not be sent",
           detail: `Backend error: ${invokeError}. Opening WhatsApp as a manual backup.`,
-          selfTargetedPhones: [],
         });
         guardians.forEach((g, i) => {
           setTimeout(() => window.open(getWhatsAppLink(g.guardian_phone), "_blank"), i * 500);
@@ -383,7 +381,6 @@ if (delivery.recipientCount === 0) {
         status: "failed",
         title: "SOS failed",
         detail: `${e?.message || e}. Opening WhatsApp as a manual backup.`,
-        selfTargetedPhones: [],
       });
       guardians.forEach((g, i) => {
         setTimeout(() => {
