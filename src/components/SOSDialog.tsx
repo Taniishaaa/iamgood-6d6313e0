@@ -368,6 +368,15 @@ if (delivery.recipientCount === 0) {
     recipients,
   });
 }
+      }
+    } catch (e: any) {
+      console.error("Failed to send SOS alerts:", e);
+      if (!navigator.onLine || String(e).includes("Failed to fetch") || String(e).includes("NetworkError")) {
+        setSending(false);
+        setIsOfflineFallback(true);
+        return;
+      }
+      
       
       toast.error(`SOS failed: ${e?.message || e} — opening WhatsApp as backup`);
       setDeliverySummary({
