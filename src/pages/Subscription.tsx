@@ -16,8 +16,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { printReceipt } from "@/lib/receiptPdf";
 import { cn } from "@/lib/utils";
 
-// Flip to true once futurewave.in/pay supports the ₹99 monthly "vitals-storage" plan.
-const VITALS_STORAGE_CHECKOUT_LIVE = false;
 
 const plans = [
   {
@@ -470,33 +468,6 @@ const Subscription = () => {
         </div>
 
         {/* Coupon Code Section */}
-        {/* Extra Vitals Storage add-on */}
-        <Card id="vitals-storage" className="border-primary/30">
-          <CardContent className="p-4 space-y-2">
-            <p className="text-lg font-semibold flex items-center gap-2"><Heart className="w-5 h-5 text-primary" /> Extra Vitals Storage</p>
-            <p className="text-base text-muted-foreground">
-              Vitals older than a month are deleted on the 7th of each month. Keep all your vitals history for ₹99/month.
-            </p>
-            {VITALS_STORAGE_CHECKOUT_LIVE ? (
-              <Button
-                className="w-full"
-                onClick={() => {
-                  if (!user) return;
-                  const cb = encodeURIComponent(`${window.location.origin}/subscription?status=success&plan=vitals-storage&billing=monthly`);
-                  const cancel = encodeURIComponent(`${window.location.origin}/subscription?status=cancelled`);
-                  window.location.href = `https://futurewave.in/pay?plan=vitals-storage&billing=monthly&amount=9900&user_id=${user.id}&app_callback=${cb}&cancel_url=${cancel}`;
-                }}
-              >
-                Add Extra Storage — ₹99/month
-              </Button>
-            ) : (
-              <div className="rounded-lg bg-muted p-3 text-base text-foreground">
-                Extra Storage checkout is coming soon — contact support to add it.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
         <Collapsible open={couponOpen} onOpenChange={setCouponOpen}>
           <CollapsibleTrigger asChild>
             <button className="flex items-center gap-1.5 text-sm text-primary mx-auto hover:underline">
