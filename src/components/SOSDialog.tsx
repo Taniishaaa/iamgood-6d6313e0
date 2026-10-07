@@ -70,7 +70,6 @@ const SOSDialog = ({ open, onClose, isPracticeMode = false }: SOSDialogProps) =>
     status: "success" | "partial" | "failed";
     title: string;
     detail: string;
-    selfTargetedPhones: string[];
     recipients?: import("@/contexts/AppContext").SOSRecipientReport[];
   } | null>(null);
   const [userName, setUserName] = useState("");
@@ -315,55 +314,60 @@ const SOSDialog = ({ open, onClose, isPracticeMode = false }: SOSDialogProps) =>
           setTimeout(() => window.open(getWhatsAppLink(g.guardian_phone), "_blank"), i * 500);
         });
       } else if (delivery) {
-        const whatsappOk = (delivery.whatsappAccepted ?? delivery.whatsappQueued) > 0;
-        const smsOk = (delivery.smsAccepted ?? delivery.smsQueued) > 0;
-        const selfTargeted = delivery.selfTargetedPhones ?? [];
-        const recipients = delivery.recipients;
+        const oneApiOk = (delivery.oneApiAccepted ?? delivery.oneApiQueued) > 0;
+const recipients = delivery.recipients;
 
-        if (delivery.recipientCount === 0) {
-          setDeliverySummary({
-            status: "failed",
-            title: "No SOS message was delivered",
-            detail: selfTargeted.length > 0
-              ? `Your guardian's phone (${selfTargeted.join(", ")}) is the same as the WhatsApp sender number. MSG91 cannot deliver a message from the sender to itself. Update the guardian's phone in My Profile to a different mobile number.`
-              : (delivery.errors.recipients || "No accepted guardians with valid phone numbers were found."),
-            selfTargetedPhones: selfTargeted,
-            recipients,
-          });
-        } else if (!whatsappOk && !smsOk) {
-          toast.error(`Provider didn't accept the alert — opening WhatsApp as backup`);
-          setDeliverySummary({
-            status: "failed",
-            title: "Provider did not accept the SOS",
-            detail: `WhatsApp: ${delivery.errors.whatsapp || "rejected"} · SMS: ${delivery.errors.sms || "rejected"}. Opening WhatsApp as a manual backup.`,
-            selfTargetedPhones: selfTargeted,
-            recipients,
-          });
-          guardians.forEach((g, i) => {
-            setTimeout(() => window.open(getWhatsAppLink(g.guardian_phone), "_blank"), i * 500);
-          });
-        } else {
-          const channels = [whatsappOk && "WhatsApp", smsOk && "SMS"].filter(Boolean).join(" + ");
-          const skippedCount = recipients ? recipients.filter(r => !r.included).length : selfTargeted.length;
-          toast.success(`SOS queued via ${channels} for ${delivery.recipientCount} guardian(s) — awaiting delivery confirmation`);
-          setDeliverySummary({
-            status: skippedCount > 0 ? "partial" : "success",
-            title: skippedCount > 0 ? "SOS partially submitted" : "SOS submitted to provider",
-            detail: skippedCount > 0
-              ? `Submitted via ${channels} for ${delivery.recipientCount} guardian(s). ${skippedCount} skipped — see details below.`
-              : `Submitted via ${channels} for ${delivery.recipientCount} guardian(s). Awaiting delivery confirmation from MSG91.`,
-            selfTargetedPhones: selfTargeted,
-            recipients,
-          });
-        }
-      }
-    } catch (e: any) {
-      console.error("Failed to send SOS alerts:", e);
-      if (!navigator.onLine || String(e).includes("Failed to fetch") || String(e).includes("NetworkError")) {
-        setSending(false);
-        setIsOfflineFallback(true);
-        return;
-      }
+if (delivery.recipientCount === 0) {
+  setDeliverySummary({
+    status: "failed",
+    title: "No SOS message was delivered",
+    detail:
+      delivery.errors.recipients ||
+      "No accepted guardians with valid phone numbers were found.",
+    recipients,
+  });
+} else if (!oneApiOk) {
+  toast.error(
+    `Provider didn't accept the alert — opening WhatsApp as backup`
+  );
+
+  setDeliverySummary({
+    status: "failed",
+    title: "Provider did not accept the SOS",
+    detail: `OneAPI: ${
+      delivery.errors.oneApi || "rejected"
+    }. Opening WhatsApp as a manual backup.`,
+    recipients,
+  });
+
+  guardians.forEach((g, i) => {
+    setTimeout(
+      () => window.open(getWhatsAppLink(g.guardian_phone), "_blank"),
+      i * 500
+    );
+  });
+} else {
+  const skippedCount = recipients
+    ? recipients.filter((r) => !r.included).length
+    : 0;
+
+  toast.success(
+    `SOS queued via MSG91 OneAPI for ${delivery.recipientCount} guardian(s) — awaiting delivery confirmation`
+  );
+
+  setDeliverySummary({
+    status: skippedCount > 0 ? "partial" : "success",
+    title:
+      skippedCount > 0
+        ? "SOS partially submitted"
+        : "SOS submitted to provider",
+    detail:
+      skippedCount > 0
+        ? `Submitted via MSG91 OneAPI for ${delivery.recipientCount} guardian(s). ${skippedCount} skipped — see details below.`
+        : `Submitted via MSG91 OneAPI for ${delivery.recipientCount} guardian(s). Awaiting delivery confirmation from MSG91.`,
+    recipients,
+  });
+}
       
       toast.error(`SOS failed: ${e?.message || e} — opening WhatsApp as backup`);
       setDeliverySummary({
@@ -514,7 +518,7 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
                 : "text-sos";
             const Icon = isFailed ? AlertCircle : CheckCircle2;
             const title = ds?.title ?? `SOS Alerts Submitted`;
-            const detail = ds?.detail ?? `Emergency alerts submitted to provider for ${guardians.length} guardian(s) — delivery status will be confirmed shortly via WhatsApp/SMS callback.`;
+            const detail = ds?.detail ?? `Emergency alerts submitted to provider for ${guardians.length} guardian(s) — delivery status will be confirmed shortly via MSG91 callback.`;
             return (
               <div className="text-center space-y-3 py-4">
                 <div className={`w-16 h-16 rounded-full ${ringClass} flex items-center justify-center mx-auto`}>
@@ -571,7 +575,7 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
                                       </Badge>
                                     </div>
                                     <span className="shrink-0 text-muted-foreground">
-                                      WA {channelLabel(r.channels.whatsapp)} · SMS {channelLabel(r.channels.sms)}
+                                      OneAPI {channelLabel(r.channels.oneapi)}
                                     </span>
                                   </div>
                                   {r.status === "pending" && (
@@ -625,15 +629,11 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
                       <div className="space-y-1.5">
                         {guardians.map((g, i) => {
                           const digits = (g.guardian_phone || "").replace(/\D/g, "");
-                          const withCc = digits.startsWith("91") ? digits : `91${digits}`;
-                          const isSender = withCc === "917045868482";
-                          const isInvalid = digits.length < 10;
-                          const skipped = isSender || isInvalid;
-                          const skipReason = isSender
-                            ? "skipped: matches sender number"
-                            : isInvalid
-                              ? "skipped: invalid number"
-                              : null;
+const isInvalid = digits.length < 10;
+const skipped = isInvalid;
+const skipReason = isInvalid
+  ? "skipped: invalid number"
+  : null;
                           return (
                             <div key={i} className="flex items-start justify-between gap-2 text-xs">
                               <div className="min-w-0">
@@ -644,7 +644,7 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
                                 )}
                               </div>
                               <span className={`shrink-0 ${skipped ? "text-destructive" : isFailed ? "text-destructive" : "text-success"}`}>
-                                {skipped ? skipReason : isFailed ? "not delivered" : "WA + SMS submitted"}
+                                {skipped ? skipReason : isFailed ? "not delivered" : "OneAPI submitted"}
                               </span>
                             </div>
                           );
@@ -1039,12 +1039,6 @@ ${location ? `<div class="section"><div class="section-title">📍 Location</div
                   {g.guardian_email && (
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
                       <Mail className="w-3 h-3" />{g.guardian_email}
-                    </p>
-                  )}
-                  {isSender && (
-                    <p className="text-[11px] font-medium text-destructive mt-1 flex items-start gap-1">
-                      <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" />
-                      This number matches the WhatsApp sender — MSG91 cannot deliver. Update in My Profile.
                     </p>
                   )}
                   {isInvalid && !isSender && (
