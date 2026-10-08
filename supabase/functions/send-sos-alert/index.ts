@@ -865,9 +865,6 @@ Deno.serve(async (req) => {
     const msg91AuthKey =
       Deno.env.get("MSG91_AUTH_KEY");
 
-    // Keep ALP configurable through Supabase Edge Function secrets.
-    const alp =
-      Deno.env.get("MSG91_SOS_ONEAPI_ALP");
 
     const oneApiUrl =
       "https://control.msg91.com/api/v5/oneapi/api/flow/sos-alerts/run";
@@ -875,9 +872,6 @@ Deno.serve(async (req) => {
     if (!msg91AuthKey) {
       oneApiError =
         "MSG91_AUTH_KEY not configured";
-    } else if (!alp) {
-      oneApiError =
-        "MSG91_SOS_ONEAPI_ALP not configured";
     } else if (!finalPhones.length) {
       oneApiError =
         "No valid guardian recipients";
@@ -911,9 +905,11 @@ Deno.serve(async (req) => {
           value: healthSummary,
         },
 
-        alp: {
-          value: alp,
-        },
+        // SMS variables (same values) for the OneAPI SMS channel.
+        var1: { type: "text", value: userNameSafe },
+        var2: { type: "text", value: istTimestamp },
+        var3: { type: "text", value: locationStr.slice(0, 200) },
+        var4: { type: "text", value: healthSummary },
       };
 
       const recipients = finalPhones.map(
@@ -1110,7 +1106,7 @@ Deno.serve(async (req) => {
       }
 
       recipient.channels.oneapi =
-        msg91AuthKey && alp
+        msg91AuthKey
           ? oneApiStatus
           : "not_attempted";
     }

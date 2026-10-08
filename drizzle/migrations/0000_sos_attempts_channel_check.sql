@@ -1,0 +1,2 @@
+ALTER TABLE public.sos_message_attempts DROP CONSTRAINT IF EXISTS sos_message_attempts_channel_check;
+ALTER TABLE public.sos_message_attempts ADD CONSTRAINT sos_message_attempts_channel_check CHECK (channel IN ('whatsapp','sms','oneapi'));
