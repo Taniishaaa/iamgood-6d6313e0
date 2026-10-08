@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1791454695698,
+      "tag": "0000_sos_attempts_channel_check",
+      "breakpoints": true
+    }
+  ]
+}
