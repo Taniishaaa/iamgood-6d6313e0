@@ -865,6 +865,7 @@ Deno.serve(async (req) => {
     const msg91AuthKey =
       Deno.env.get("MSG91_AUTH_KEY");
 
+
     const oneApiUrl =
       "https://control.msg91.com/api/v5/oneapi/api/flow/sos-alerts/run";
 
@@ -923,6 +924,11 @@ Deno.serve(async (req) => {
         var4: {
           value: healthSummary,
         },
+        // SMS variables (same values) for the OneAPI SMS channel.
+        var1: { type: "text", value: userNameSafe },
+        var2: { type: "text", value: istTimestamp },
+        var3: { type: "text", value: locationStr.slice(0, 200) },
+        var4: { type: "text", value: healthSummary },
       };
 
       const recipients = finalPhones.map(
