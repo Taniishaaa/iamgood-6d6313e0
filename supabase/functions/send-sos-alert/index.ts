@@ -865,19 +865,12 @@ Deno.serve(async (req) => {
     const msg91AuthKey =
       Deno.env.get("MSG91_AUTH_KEY");
 
-    // Keep ALP configurable through Supabase Edge Function secrets.
-    const alp =
-      Deno.env.get("MSG91_SOS_ONEAPI_ALP");
-
     const oneApiUrl =
       "https://control.msg91.com/api/v5/oneapi/api/flow/sos-alerts/run";
 
     if (!msg91AuthKey) {
       oneApiError =
         "MSG91_AUTH_KEY not configured";
-    } else if (!alp) {
-      oneApiError =
-        "MSG91_SOS_ONEAPI_ALP not configured";
     } else if (!finalPhones.length) {
       oneApiError =
         "No valid guardian recipients";
@@ -887,6 +880,7 @@ Deno.serve(async (req) => {
       // -----------------------------------------------------------------------
 
       const recipientVariables = {
+        // WhatsApp variables
         body_var_1: {
           type: "text",
           parameter_name: "var_1",
@@ -911,8 +905,23 @@ Deno.serve(async (req) => {
           value: healthSummary,
         },
 
-        alp: {
-          value: alp,
+        // SMS variables
+        // These contain the same values as the corresponding
+        // WhatsApp variables, as required by the OneAPI flow.
+        var1: {
+          value: userNameSafe,
+        },
+
+        var2: {
+          value: istTimestamp,
+        },
+
+        var3: {
+          value: locationStr.slice(0, 200),
+        },
+
+        var4: {
+          value: healthSummary,
         },
       };
 
@@ -1110,7 +1119,7 @@ Deno.serve(async (req) => {
       }
 
       recipient.channels.oneapi =
-        msg91AuthKey && alp
+        msg91AuthKey
           ? oneApiStatus
           : "not_attempted";
     }
