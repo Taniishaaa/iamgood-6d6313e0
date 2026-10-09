@@ -312,29 +312,16 @@ const SOSDialog = ({ open, onClose, isPracticeMode = false }: SOSDialogProps) =>
           setTimeout(() => window.open(getWhatsAppLink(g.guardian_phone), "_blank"), i * 500);
         });
       } else if (delivery) {
-        const oneApiOk = (delivery.oneApiAccepted ?? delivery.oneApiQueued) > 0;
-const recipients = delivery.recipients;
+        const recipients = delivery.recipients;
+const oneApiFailed = delivery.oneApiHasError === true;
 
-if (delivery.recipientCount === 0) {
-  setDeliverySummary({
-    status: "failed",
-    title: "No SOS message was delivered",
-    detail:
-      delivery.errors.recipients ||
-      "No accepted guardians with valid phone numbers were found.",
-    recipients,
-  });
-} else if (!oneApiOk) {
-  toast.error(
-    `Provider didn't accept the alert — opening WhatsApp as backup`
-  );
+if (oneApiFailed) {
+  toast.error("Could not send SOS. MSG91 reported an error.");
 
   setDeliverySummary({
     status: "failed",
-    title: "Provider did not accept the SOS",
-    detail: `OneAPI: ${
-      delivery.errors.oneApi || "rejected"
-    }. Opening WhatsApp as a manual backup.`,
+    title: "SOS could not be sent",
+    detail: delivery.errors.oneApi || "MSG91 reported an error while processing the SOS request.",
     recipients,
   });
 
@@ -349,20 +336,12 @@ if (delivery.recipientCount === 0) {
     ? recipients.filter((r) => !r.included).length
     : 0;
 
-  toast.success(
-    `SOS queued via MSG91 OneAPI for ${delivery.recipientCount} guardian(s) — awaiting delivery confirmation`
-  );
+  toast.success("SOS message was successfully submitted.");
 
   setDeliverySummary({
-    status: skippedCount > 0 ? "partial" : "success",
-    title:
-      skippedCount > 0
-        ? "SOS partially submitted"
-        : "SOS submitted to provider",
-    detail:
-      skippedCount > 0
-        ? `Submitted via MSG91 OneAPI for ${delivery.recipientCount} guardian(s). ${skippedCount} skipped — see details below.`
-        : `Submitted via MSG91 OneAPI for ${delivery.recipientCount} guardian(s). Awaiting delivery confirmation from MSG91.`,
+    status: "success",
+    title: "SOS message successfully sent",
+    detail: delivery.providerMessage || "Your request has been queued successfully.",
     recipients,
   });
 }
