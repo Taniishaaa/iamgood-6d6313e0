@@ -901,6 +901,7 @@ Deno.serve(async (req) => {
     let oneApiAccepted = 0;
     let oneApiRequestId: string | null = null;
     let oneApiError: string | null = null;
+    let oneApiProviderMessage: string | null = null;
     let oneApiRawResponse: any = null;
 
     const msg91AuthKey =
@@ -1032,24 +1033,41 @@ Deno.serve(async (req) => {
           },
         );
 
+        oneApiProviderMessage =
+          result?.data?.message ?? result?.message ?? null;
+
         // MSG91 normally returns a request_id for an accepted request.
         oneApiRequestId =
+          result?.data?.request_id ??
           result?.request_id ??
           result?.requestId ??
           result?.message_id ??
           null;
 
-        const responseType =
-          result?.type ??
-          result?.status;
+        // MSG91 OneAPI response contract:
+        // { status: "success", hasError: false, errors: [], data: { request_id, message } }
+        // Treat hasError=true as a provider failure even if HTTP itself is 2xx.
+        const responseType = String(
+          result?.status ?? result?.type ?? "",
+        ).toLowerCase();
+        const providerHasError =
+          result?.hasError === true ||
+          result?.data?.hasError === true ||
+          responseType === "error" ||
+          responseType === "failed";
 
-        const isAccepted =
-          res.ok &&
-          responseType !== "error";
+        const isAccepted = res.ok && !providerHasError;
 
         if (isAccepted) {
-          oneApiAccepted =
-            finalPhones.length;
+          oneApiAccepted = finalPhones.length;
+          console.log(
+            "[send-sos-alert] MSG91 accepted OneAPI request",
+            {
+              requestId: oneApiRequestId,
+              message: result?.data?.message ?? result?.message ?? null,
+              hasError: result?.hasError ?? false,
+            },
+          );
         } else {
           oneApiError =
             `status=${res.status} ${rawText.slice(0, 500)}`;
@@ -1352,6 +1370,8 @@ Deno.serve(async (req) => {
         // New unified provider result.
         oneApiAccepted,
         oneApiRequestId,
+        oneApiHasError: Boolean(oneApiError),
+        providerMessage: oneApiProviderMessage,
 
         recipientCount:
           finalPhones.length,
