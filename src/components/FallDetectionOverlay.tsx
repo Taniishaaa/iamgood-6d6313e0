@@ -240,16 +240,11 @@ const FallDetectionOverlay = () => {
       const delivery = result.delivery;
 
       // MSG91 WhatsApp + SMS are now handled together through OneAPI.
-      const oneApiOk =
-        (delivery?.oneApiAccepted ??
-          delivery?.oneApiQueued ??
-          0) > 0;
+      const oneApiFailed = delivery?.oneApiHasError === true;
 
-      // Manual wa.me fallback only if backend invocation truly failed
-      // OR MSG91 OneAPI did not accept the alert despite having recipients.
-      const hasRecipients = (delivery?.recipientCount ?? 0) > 0;
-
-      if (result.invokeError || (hasRecipients && !oneApiOk)) {
+      // Only open the manual WhatsApp fallback when invocation failed or
+      // MSG91 explicitly reports an error. A successful/queued response is success.
+      if (result.invokeError || oneApiFailed) {
         if (isCancelledRef.current) return;
 
         guardians.forEach((g, i) => {
