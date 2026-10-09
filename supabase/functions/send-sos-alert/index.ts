@@ -793,6 +793,40 @@ Deno.serve(async (req) => {
 
     let healthSummary = "See app for details";
 
+    // Convert blood-group notation to words because the OneAPI template
+    // should receive plain text without punctuation such as colons or pipes.
+    function formatBloodGroup(raw: string): string {
+      const value = String(raw)
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g, "");
+
+      const match = value.match(/^(AB|A|B|O|0)([+-])?$/);
+      if (!match) {
+        return String(raw)
+          .replace(/[^a-zA-Z0-9 ]/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+
+      const group = match[1] === "0" ? "O" : match[1];
+      const sign = match[2] === "+"
+        ? " positive"
+        : match[2] === "-"
+          ? " negative"
+          : "";
+
+      return `${group}${sign}`;
+    }
+
+    function plainTemplateText(value: unknown): string {
+      return String(value ?? "")
+        .replace(/[;:|,]/g, " ")
+        .replace(/[^a-zA-Z0-9 +()./-]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
     try {
       const { data: hp } =
         await supabase
@@ -808,7 +842,7 @@ Deno.serve(async (req) => {
 
         if (hp.blood_group) {
           parts.push(
-            `Blood: ${hp.blood_group}`,
+            `Blood group ${formatBloodGroup(hp.blood_group)}`,
           );
         }
 
@@ -816,23 +850,30 @@ Deno.serve(async (req) => {
           Array.isArray(hp.chronic_conditions) &&
           hp.chronic_conditions.length
         ) {
-          parts.push(
-            `Conditions: ${hp.chronic_conditions.join(", ")}`,
-          );
+          const conditions = hp.chronic_conditions
+            .map((item: unknown) => plainTemplateText(item))
+            .filter(Boolean)
+            .join(" ");
+          if (conditions) {
+            parts.push(`Conditions ${conditions}`);
+          }
         }
 
         if (
           Array.isArray(hp.allergies) &&
           hp.allergies.length
         ) {
-          parts.push(
-            `Allergies: ${hp.allergies.join(", ")}`,
-          );
+          const allergies = hp.allergies
+            .map((item: unknown) => plainTemplateText(item))
+            .filter(Boolean)
+            .join(" ");
+          if (allergies) {
+            parts.push(`Allergies ${allergies}`);
+          }
         }
 
         if (parts.length) {
-          healthSummary = parts
-            .join(" | ")
+          healthSummary = plainTemplateText(parts.join(" "))
             .slice(0, 200);
         }
       }
@@ -906,9 +947,7 @@ Deno.serve(async (req) => {
           value: healthSummary,
         },
 
-        // SMS variables
-        // These contain the same values as the corresponding
-        // WhatsApp variables, as required by the OneAPI flow.
+        // SMS variables use the same values as the WhatsApp variables.
         var1: {
           value: userNameSafe,
         },
@@ -924,11 +963,6 @@ Deno.serve(async (req) => {
         var4: {
           value: healthSummary,
         },
-        // SMS variables (same values) for the OneAPI SMS channel.
-        var1: { type: "text", value: userNameSafe },
-        var2: { type: "text", value: istTimestamp },
-        var3: { type: "text", value: locationStr.slice(0, 200) },
-        var4: { type: "text", value: healthSummary },
       };
 
       const recipients = finalPhones.map(
