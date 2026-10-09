@@ -36,6 +36,9 @@ export interface SOSDeliveryResult {
   oneApiQueued: number;
 
   oneApiRequestId?: string | null;
+  // True only when MSG91 OneAPI explicitly reports an error or the request fails.
+  oneApiHasError?: boolean;
+  providerMessage?: string | null;
 
   emailQueued?: number;
   pushSent?: number;
@@ -197,6 +200,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           {
             body: {
               user_id: session.user.id,
+              // Tie this request to the exact SOS event. The DB trigger may
+              // already have dispatched it before the client invocation runs.
+              sos_event_id: sosId,
               message: messageText,
               guardian_emails,
               guardian_phones,
@@ -224,42 +230,89 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         const d = data as any;
 
-        const oneApiAccepted = d?.oneApiAccepted ?? 0;
+        // Older Edge Function deployments returned msg91Sent, while the
+        // OneAPI version returns oneApiAccepted. Accept either response shape.
+        let oneApiAccepted = Math.max(
+          Number(d?.oneApiAccepted ?? 0),
+          Number(d?.oneApiQueued ?? 0),
+          Number(d?.msg91Sent ?? 0),
+        );
+        let recipientCount = Number(d?.recipientCount ?? 0);
+        let oneApiRequestId = d?.oneApiRequestId ?? d?.request_id ?? null;
+        let deliveryPending = !!d?.deliveryPending;
+        let recipients = Array.isArray(d?.recipients) ? d.recipients : undefined;
+        let oneApiError = d?.errors?.oneApi ?? null;
+        let oneApiHasError = d?.oneApiHasError === true || d?.hasError === true;
+        let providerMessage = d?.providerMessage ?? d?.data?.message ?? null;
+        let recipientsError = d?.errors?.recipients ?? null;
+
+        // A DB trigger can dispatch SOS first. The subsequent client invocation
+        // then returns { skipped: true, reason: "already_dispatched" } without
+        // the normal counters. Check the existing attempts before deciding the
+        // frontend should show a failure.
+        if (d?.skipped === true && d?.reason === "already_dispatched") {
+          const { data: attempts, error: attemptsError } = await supabase
+            .from("sos_message_attempts")
+            .select("recipient_phone, provider_status, delivery_status, request_id, failure_reason")
+            .eq("sos_event_id", sosId);
+
+          if (!attemptsError && Array.isArray(attempts) && attempts.length > 0) {
+            recipientCount = attempts.length;
+            const acceptedAttempts = attempts.filter((attempt: any) => {
+              const providerStatus = String(attempt.provider_status ?? "").toLowerCase();
+              const deliveryStatus = String(attempt.delivery_status ?? "").toLowerCase();
+              return providerStatus === "accepted" || ["pending", "sent", "delivered"].includes(deliveryStatus);
+            });
+            oneApiAccepted = acceptedAttempts.length;
+            oneApiRequestId = attempts.find((attempt: any) => attempt.request_id)?.request_id ?? null;
+            deliveryPending = acceptedAttempts.some((attempt: any) => ["pending", "sent"].includes(String(attempt.delivery_status ?? "").toLowerCase()));
+            if (oneApiAccepted === 0) {
+              oneApiError = attempts.find((attempt: any) => attempt.failure_reason)?.failure_reason ?? null;
+              oneApiHasError = Boolean(oneApiError);
+            } else {
+              oneApiError = null;
+              oneApiHasError = false;
+            }
+          } else {
+            // Idempotency means a dispatch attempt already exists. If the
+            // current user's role cannot read attempt rows, avoid incorrectly
+            // displaying a definite failure based on missing response fields.
+            recipientCount = Math.max(recipientCount, guardian_phones.length);
+            oneApiAccepted = Math.max(oneApiAccepted, recipientCount);
+            deliveryPending = true;
+            oneApiError = null;
+            oneApiHasError = false;
+          }
+        } else {
+          recipientCount = Math.max(
+            recipientCount,
+            Number(d?.recipient_count ?? 0),
+            oneApiAccepted,
+          );
+        }
 
         const delivery: SOSDeliveryResult = {
-          recipientCount: d?.recipientCount ?? 0,
-
+          recipientCount,
           oneApiAccepted,
           oneApiQueued: oneApiAccepted,
-
-          oneApiRequestId: d?.oneApiRequestId ?? null,
-
+          oneApiRequestId,
+          oneApiHasError,
+          providerMessage,
           emailQueued: d?.emailQueued ?? 0,
           pushSent: d?.pushSent ?? 0,
-          deliveryPending: !!d?.deliveryPending,
-
-          recipients: Array.isArray(d?.recipients)
-            ? d.recipients
-            : undefined,
-
+          deliveryPending,
+          recipients,
           errors: {
             invoke: null,
-            recipients: d?.errors?.recipients ?? null,
-            oneApi: d?.errors?.oneApi ?? null,
+            recipients: recipientsError,
+            oneApi: oneApiError,
           },
         };
 
-        if (delivery.recipientCount === 0) {
-          toast.error(
-            delivery.errors.recipients ||
-              "No accepted guardians with valid phone numbers"
-          );
-        } else if (oneApiAccepted === 0) {
-          toast.error(
-            `SOS not accepted by provider. OneAPI: ${
-              delivery.errors.oneApi || "n/a"
-            }`
-          );
+        if (delivery.oneApiHasError) {
+          toast.error("Could not send SOS. MSG91 reported an error.");
+        } else {
+          toast.success("SOS message was successfully submitted.");
         }
 
         return { delivery, invokeError: null };
