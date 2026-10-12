@@ -793,38 +793,21 @@ Deno.serve(async (req) => {
 
     let healthSummary = "See app for details";
 
-    // Convert blood-group notation to words because the OneAPI template
-    // should receive plain text without punctuation such as colons or pipes.
+    // Convert blood group symbols to plain words for MSG91 templates.
     function formatBloodGroup(raw: string): string {
-      const value = String(raw)
-        .trim()
-        .toUpperCase()
-        .replace(/\s+/g, "");
+      const normalized = raw.trim().toUpperCase().replace(/\\s+/g, "");
+      const match = normalized.match(/^(AB|A|B|O)([+-])?$/);
 
-      const match = value.match(/^(AB|A|B|O|0)([+-])?$/);
       if (!match) {
-        return String(raw)
-          .replace(/[^a-zA-Z0-9 ]/g, " ")
-          .replace(/\s+/g, " ")
-          .trim();
+        return raw.trim().replace(/[;:|,]/g, " ");
       }
 
-      const group = match[1] === "0" ? "O" : match[1];
-      const sign = match[2] === "+"
-        ? " positive"
-        : match[2] === "-"
-          ? " negative"
-          : "";
+      const group = match[1];
+      const sign = match[2];
 
-      return `${group}${sign}`;
-    }
-
-    function plainTemplateText(value: unknown): string {
-      return String(value ?? "")
-        .replace(/[;:|,]/g, " ")
-        .replace(/[^a-zA-Z0-9 +()./-]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
+      if (sign === "+") return `Blood ${group} positive`;
+      if (sign === "-") return `Blood ${group} negative`;
+      return `Blood ${group}`;
     }
 
     try {
@@ -841,39 +824,39 @@ Deno.serve(async (req) => {
         const parts: string[] = [];
 
         if (hp.blood_group) {
-          parts.push(
-            `Blood group ${formatBloodGroup(hp.blood_group)}`,
-          );
+          parts.push(formatBloodGroup(String(hp.blood_group)));
         }
 
         if (
           Array.isArray(hp.chronic_conditions) &&
           hp.chronic_conditions.length
         ) {
-          const conditions = hp.chronic_conditions
-            .map((item: unknown) => plainTemplateText(item))
-            .filter(Boolean)
-            .join(" ");
-          if (conditions) {
-            parts.push(`Conditions ${conditions}`);
-          }
+          parts.push(
+            `Conditions ${hp.chronic_conditions
+              .map((item: unknown) => String(item).replace(/[;:|,]/g, " ").trim())
+              .filter(Boolean)
+              .join(" ")}`,
+          );
         }
 
         if (
           Array.isArray(hp.allergies) &&
           hp.allergies.length
         ) {
-          const allergies = hp.allergies
-            .map((item: unknown) => plainTemplateText(item))
-            .filter(Boolean)
-            .join(" ");
-          if (allergies) {
-            parts.push(`Allergies ${allergies}`);
-          }
+          parts.push(
+            `Allergies ${hp.allergies
+              .map((item: unknown) => String(item).replace(/[;:|,]/g, " ").trim())
+              .filter(Boolean)
+              .join(" ")}`,
+          );
         }
 
         if (parts.length) {
-          healthSummary = plainTemplateText(parts.join(" "))
+          healthSummary = parts
+            .join(" ")
+            .replace(/[;:|,]/g, " ")
+            .replace(/\\s+/g, " ")
+            .trim()
             .slice(0, 200);
         }
       }
@@ -901,7 +884,6 @@ Deno.serve(async (req) => {
     let oneApiAccepted = 0;
     let oneApiRequestId: string | null = null;
     let oneApiError: string | null = null;
-    let oneApiProviderMessage: string | null = null;
     let oneApiRawResponse: any = null;
 
     const msg91AuthKey =
@@ -948,7 +930,9 @@ Deno.serve(async (req) => {
           value: healthSummary,
         },
 
-        // SMS variables use the same values as the WhatsApp variables.
+        // SMS variables
+        // These contain the same values as the corresponding
+        // WhatsApp variables, as required by the OneAPI flow.
         var1: {
           value: userNameSafe,
         },
@@ -964,6 +948,11 @@ Deno.serve(async (req) => {
         var4: {
           value: healthSummary,
         },
+        // SMS variables (same values) for the OneAPI SMS channel.
+        var1: { type: "text", value: userNameSafe },
+        var2: { type: "text", value: istTimestamp },
+        var3: { type: "text", value: locationStr.slice(0, 200) },
+        var4: { type: "text", value: healthSummary },
       };
 
       const recipients = finalPhones.map(
@@ -1033,41 +1022,24 @@ Deno.serve(async (req) => {
           },
         );
 
-        oneApiProviderMessage =
-          result?.data?.message ?? result?.message ?? null;
-
         // MSG91 normally returns a request_id for an accepted request.
         oneApiRequestId =
-          result?.data?.request_id ??
           result?.request_id ??
           result?.requestId ??
           result?.message_id ??
           null;
 
-        // MSG91 OneAPI response contract:
-        // { status: "success", hasError: false, errors: [], data: { request_id, message } }
-        // Treat hasError=true as a provider failure even if HTTP itself is 2xx.
-        const responseType = String(
-          result?.status ?? result?.type ?? "",
-        ).toLowerCase();
-        const providerHasError =
-          result?.hasError === true ||
-          result?.data?.hasError === true ||
-          responseType === "error" ||
-          responseType === "failed";
+        const responseType =
+          result?.type ??
+          result?.status;
 
-        const isAccepted = res.ok && !providerHasError;
+        const isAccepted =
+          res.ok &&
+          responseType !== "error";
 
         if (isAccepted) {
-          oneApiAccepted = finalPhones.length;
-          console.log(
-            "[send-sos-alert] MSG91 accepted OneAPI request",
-            {
-              requestId: oneApiRequestId,
-              message: result?.data?.message ?? result?.message ?? null,
-              hasError: result?.hasError ?? false,
-            },
-          );
+          oneApiAccepted =
+            finalPhones.length;
         } else {
           oneApiError =
             `status=${res.status} ${rawText.slice(0, 500)}`;
@@ -1370,8 +1342,6 @@ Deno.serve(async (req) => {
         // New unified provider result.
         oneApiAccepted,
         oneApiRequestId,
-        oneApiHasError: Boolean(oneApiError),
-        providerMessage: oneApiProviderMessage,
 
         recipientCount:
           finalPhones.length,
