@@ -779,6 +779,24 @@ Deno.serve(async (req) => {
       ) {
         locationStr =
           `https://maps.google.com/?q=${sosRow.latitude},${sosRow.longitude}`;
+      } else {
+        // Fall back to the ward's last known location (saved by the app
+        // while location sharing is on) — covers auto-raised SOS events
+        // (e.g. missed check-in escalation) that have no GPS of their own.
+        const { data: settingsRow } = await supabase
+          .from("user_settings")
+          .select("settings")
+          .eq("user_id", user_id)
+          .maybeSingle();
+        const last = (settingsRow?.settings as any)?.lastLocation;
+        if (
+          last &&
+          typeof last.lat === "number" &&
+          typeof last.lng === "number"
+        ) {
+          locationStr =
+            `https://maps.google.com/?q=${last.lat},${last.lng}`;
+        }
       }
     } catch (e) {
       console.error(
