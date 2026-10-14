@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Pill, TrendingUp, Activity, Heart, Utensils, CheckCircle, Navigation, BriefcaseMedical, FileSearch, Stethoscope } from "lucide-react";
+import { Pill, TrendingUp, Activity, Heart, Utensils, CheckCircle, Navigation, BriefcaseMedical, FileSearch, Stethoscope, TestTube2, Loader2, ExternalLink } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/sonner";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,7 +24,7 @@ import VisualHealthReport, { tryParseVisualReport } from "@/components/health-to
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useIsPrimaryGuardian } from "@/hooks/useIsPrimaryGuardian";
 
-type ReportSection = "medications" | "checkins" | "activity" | "vitals" | "nutrition" | "journeys" | "hospital_visit" | "analysis" | "doctor_visit";
+type ReportSection = "medications" | "checkins" | "activity" | "vitals" | "nutrition" | "journeys" | "hospital_visit" | "analysis" | "doctor_visit" | "lab_tests";
 
 const GuardianReports = () => {
   const { session } = useAuth();
