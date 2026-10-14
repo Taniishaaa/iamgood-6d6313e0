@@ -587,7 +587,7 @@ Deno.serve(async (req) => {
       const normalizedPhone =
         normalizePhone(guardian.guardian_phone);
 
-      const status =
+      const status: "accepted" | "pending" =
         guardian.status === "accepted"
           ? "accepted"
           : "pending";
@@ -779,6 +779,24 @@ Deno.serve(async (req) => {
       ) {
         locationStr =
           `https://maps.google.com/?q=${sosRow.latitude},${sosRow.longitude}`;
+      } else {
+        // Fall back to the ward's last known location (saved by the app
+        // while location sharing is on) — covers auto-raised SOS events
+        // (e.g. missed check-in escalation) that have no GPS of their own.
+        const { data: settingsRow } = await supabase
+          .from("user_settings")
+          .select("settings")
+          .eq("user_id", user_id)
+          .maybeSingle();
+        const last = (settingsRow?.settings as any)?.lastLocation;
+        if (
+          last &&
+          typeof last.lat === "number" &&
+          typeof last.lng === "number"
+        ) {
+          locationStr =
+            `https://maps.google.com/?q=${last.lat},${last.lng}`;
+        }
       }
     } catch (e) {
       console.error(
@@ -930,25 +948,8 @@ Deno.serve(async (req) => {
           value: healthSummary,
         },
 
-        // SMS variables
-        // These contain the same values as the corresponding
-        // WhatsApp variables, as required by the OneAPI flow.
-        var1: {
-          value: userNameSafe,
-        },
-
-        var2: {
-          value: istTimestamp,
-        },
-
-        var3: {
-          value: locationStr.slice(0, 200),
-        },
-
-        var4: {
-          value: healthSummary,
-        },
-        // SMS variables (same values) for the OneAPI SMS channel.
+        // SMS variables (same values as the corresponding WhatsApp
+        // variables), as required by the OneAPI flow.
         var1: { type: "text", value: userNameSafe },
         var2: { type: "text", value: istTimestamp },
         var3: { type: "text", value: locationStr.slice(0, 200) },
