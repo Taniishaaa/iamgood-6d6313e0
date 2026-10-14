@@ -267,14 +267,28 @@ export const OrangeLabTests: React.FC = () => {
               patient_phone: patientPhone.replace(/\D/g, "").slice(-10),
               age: patientAge ? String(patientAge) : "65",
               gender: patientGender || "male",
-              tests: selectedTests.map((t) => ({ test_id: t.id, name: t.name })),
+              tests: selectedTests.map((t) => ({ test_id: String(t.id) })),
             },
           ],
         },
       });
 
-      if (error || data?.error) {
-        throw new Error(data?.error || error?.message || "Booking creation failed");
+      if (error) {
+        let errorMsg = error.message;
+        try {
+          const body = (error as any).context ? await (error as any).context.json() : null;
+          if (body?.details?.status) errorMsg = body.details.status;
+          else if (body?.details?.message) errorMsg = body.details.message;
+          else if (body?.error) errorMsg = body.error;
+        } catch {
+          // fallback to error.message
+        }
+        throw new Error(errorMsg || "Booking creation failed");
+      }
+
+      if (data?.error) {
+        const msg = data?.details?.status || data?.details?.message || data.error;
+        throw new Error(msg);
       }
 
       setBookedSuccess(data?.order || { success: true });
