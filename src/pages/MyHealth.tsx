@@ -22,6 +22,7 @@ import TeleConsult from "@/components/health-tools/TeleConsult";
 import EmergencyFirstAid from "@/components/health-tools/EmergencyFirstAid";
 import UrineCheck from "@/components/health-tools/UrineCheck";
 import TongueAnalysis from "@/components/health-tools/TongueAnalysis";
+import OrangeLabTests from "@/components/health-tools/OrangeLabTests";
 import UpgradeDialog from "@/components/UpgradeDialog";
 import { useFeatureGate } from "@/hooks/useFeatureGate";
 import useRefillDue from "@/hooks/useRefillDue";
@@ -37,6 +38,7 @@ const healthTools = [
 
 
 const healthToolsSubItems = [
+  { icon: TestTube, label: "Home Lab Tests", desc: "Doorstep diagnostic sample collection by Orange Health Labs" },
   { icon: FileText, label: "Doctor Visit Report", desc: "Generate health summary for doctor visits" },
   { icon: Receipt, label: "Hospital Bill Analyzer", desc: "Check bill for duplicates & overcharging" },
 ];
@@ -49,6 +51,7 @@ const wellnessHubSubItems = [
 ];
 
 const subToolComponents: Record<string, React.FC> = {
+  "Home Lab Tests": OrangeLabTests,
   "Doctor Visit Report": DoctorVisitReport,
   
   "Document Analyzer": DocumentAnalyzer,
