@@ -167,6 +167,38 @@ const GuardianReports = () => {
     });
   };
 
+  const refreshLabOrders = async () => {
+    if (!wardUserId) return;
+    const { data } = await supabase.from("lab_orders" as any).select("*").eq("user_id", wardUserId).order("created_at", { ascending: false });
+    setLabOrders((data as any) || []);
+  };
+
+  const handleCheckLabResults = async (order: any) => {
+    setCheckingLabResults(order.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("orange-health", {
+        body: {
+          action: "test-results",
+          primary_patient_number: order.patient_phone,
+          order_id: order.id,
+        },
+      });
+      if (error) throw error;
+      if (data?.ready && data?.data?.report_url) {
+        toast.success("Test report is ready!");
+        await refreshLabOrders();
+        window.open(data.data.report_url, "_blank");
+      } else {
+        toast.info(data?.message || "Sample is being processed by the lab. Report not ready yet.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to check report status");
+    } finally {
+      setCheckingLabResults(null);
+    }
+  };
+
   if (loading) {
     return <AppLayout><div className="p-4 text-center text-muted-foreground">Loading...</div></AppLayout>;
   }
@@ -188,6 +220,7 @@ const GuardianReports = () => {
     { id: "journeys", label: "Journeys", icon: Navigation },
     { id: "hospital_visit", label: "Hospital Visit", icon: BriefcaseMedical },
     { id: "analysis", label: "Analysis Reports", icon: FileSearch },
+    { id: "lab_tests", label: "Lab Tests", icon: TestTube2 },
     ...(isPrimary ? [{ id: "doctor_visit" as ReportSection, label: "Doctor Visit", icon: Stethoscope }] : []),
   ];
 
