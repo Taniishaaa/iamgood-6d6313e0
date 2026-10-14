@@ -398,6 +398,79 @@ const GuardianReports = () => {
           <AnalysisReportTab wardUserId={wardUserId} wardName={wardName} />
         )}
 
+        {/* Lab Tests — Home Lab Test bookings & reports */}
+        {activeSection === "lab_tests" && (
+          <div className="space-y-3">
+            {labOrders.length === 0 ? (
+              <Card>
+                <CardContent className="p-6 text-center text-muted-foreground text-sm">
+                  No lab tests booked yet
+                </CardContent>
+              </Card>
+            ) : (
+              labOrders.map((order: any) => {
+                const tests = Array.isArray(order.tests) ? order.tests : [];
+                const status = String(order.status || "booked");
+                const statusVariant = status === "completed" ? "default" : status === "cancelled" ? "destructive" : "secondary";
+                return (
+                  <Card key={order.id}>
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold">{order.patient_name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Booked {format(new Date(order.created_at), "dd MMM yyyy")}
+                            {order.slot_datetime ? ` • Slot ${format(new Date(order.slot_datetime), "dd MMM, hh:mm a")}` : ""}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          <Badge variant={statusVariant as any} className="capitalize text-[10px]">{status.replace(/_/g, " ")}</Badge>
+                          {order.payment_status && (
+                            <Badge variant="outline" className="capitalize text-[10px]">{order.payment_status}</Badge>
+                          )}
+                        </div>
+                      </div>
+                      {tests.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {tests.map((t: any, i: number) => (
+                            <Badge key={i} variant="outline" className="text-[10px]">{t?.name || "Test"}</Badge>
+                          ))}
+                        </div>
+                      )}
+                      {order.address && (
+                        <p className="text-xs text-muted-foreground line-clamp-2">{order.address}</p>
+                      )}
+                      <div className="flex items-center justify-between gap-2">
+                        {order.total_price != null && (
+                          <p className="text-xs font-semibold">₹{Number(order.total_price).toLocaleString("en-IN")}</p>
+                        )}
+                        <div className="flex gap-2 ml-auto">
+                          {order.report_url ? (
+                            <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => window.open(order.report_url, "_blank")}>
+                              <ExternalLink className="w-3 h-3" /> View Report
+                            </Button>
+                          ) : status !== "cancelled" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 text-xs gap-1"
+                              disabled={checkingLabResults === order.id}
+                              onClick={() => handleCheckLabResults(order)}
+                            >
+                              {checkingLabResults === order.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileSearch className="w-3 h-3" />}
+                              Check Results
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
+          </div>
+        )}
+
         {/* Doctor Visit Reports — Primary Guardian only */}
         {activeSection === "doctor_visit" && wardUserId && (
           isPrimary ? (
