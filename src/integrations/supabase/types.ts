@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.4"
   }
   public: {
     Tables: {
@@ -1349,6 +1349,81 @@ export type Database = {
           started_at?: string | null
           status?: string
           transport_mode?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      lab_orders: {
+        Row: {
+          address: string
+          city_request_id: string | null
+          created_at: string
+          id: string
+          latitude: number | null
+          longitude: number | null
+          notes: string | null
+          orange_order_id: string | null
+          patient_age: number | null
+          patient_gender: string | null
+          patient_name: string
+          patient_phone: string
+          payment_status: string
+          raw_response: Json | null
+          report_data: Json | null
+          report_url: string | null
+          slot_datetime: string | null
+          status: string
+          tests: Json
+          total_price: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address: string
+          city_request_id?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          orange_order_id?: string | null
+          patient_age?: number | null
+          patient_gender?: string | null
+          patient_name: string
+          patient_phone: string
+          payment_status?: string
+          raw_response?: Json | null
+          report_data?: Json | null
+          report_url?: string | null
+          slot_datetime?: string | null
+          status?: string
+          tests?: Json
+          total_price?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string
+          city_request_id?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          orange_order_id?: string | null
+          patient_age?: number | null
+          patient_gender?: string | null
+          patient_name?: string
+          patient_phone?: string
+          payment_status?: string
+          raw_response?: Json | null
+          report_data?: Json | null
+          report_url?: string | null
+          slot_datetime?: string | null
+          status?: string
+          tests?: Json
+          total_price?: number | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
