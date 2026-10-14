@@ -103,7 +103,7 @@ export const OrangeLabTests: React.FC = () => {
     const loadProfile = async () => {
       const { data: profile } = await supabase
         .from("profiles")
-        .select("full_name, phone")
+        .select("full_name, phone, date_of_birth, gender")
         .eq("id", session.user.id)
         .maybeSingle();
 
@@ -114,18 +114,9 @@ export const OrangeLabTests: React.FC = () => {
           const national = raw.startsWith("91") && raw.length > 10 ? raw.slice(2) : raw;
           setPatientPhone(national);
         }
-      }
-
-      const { data: healthProfile } = await supabase
-        .from("health_profile")
-        .select("blood_group, date_of_birth, gender")
-        .eq("user_id", session.user.id)
-        .maybeSingle();
-
-      if (healthProfile) {
-        if (healthProfile.gender) setPatientGender(healthProfile.gender.toLowerCase());
-        if (healthProfile.date_of_birth) {
-          const birthYear = new Date(healthProfile.date_of_birth).getFullYear();
+        if (profile.gender) setPatientGender(profile.gender.toLowerCase());
+        if (profile.date_of_birth) {
+          const birthYear = new Date(profile.date_of_birth).getFullYear();
           const currentYear = new Date().getFullYear();
           if (birthYear > 1900) setPatientAge(String(currentYear - birthYear));
         }
