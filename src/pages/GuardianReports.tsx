@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Pill, TrendingUp, Activity, Heart, Utensils, CheckCircle, Navigation, BriefcaseMedical, FileSearch, Stethoscope } from "lucide-react";
+import { Pill, TrendingUp, Activity, Heart, Utensils, CheckCircle, Navigation, BriefcaseMedical, FileSearch, Stethoscope, TestTube2, Loader2, ExternalLink } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/sonner";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,7 +24,7 @@ import VisualHealthReport, { tryParseVisualReport } from "@/components/health-to
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useIsPrimaryGuardian } from "@/hooks/useIsPrimaryGuardian";
 
-type ReportSection = "medications" | "checkins" | "activity" | "vitals" | "nutrition" | "journeys" | "hospital_visit" | "analysis" | "doctor_visit";
+type ReportSection = "medications" | "checkins" | "activity" | "vitals" | "nutrition" | "journeys" | "hospital_visit" | "analysis" | "doctor_visit" | "lab_tests";
 
 const GuardianReports = () => {
   const { session } = useAuth();
@@ -44,6 +46,8 @@ const GuardianReports = () => {
   const [mealLogs, setMealLogs] = useState<any[]>([]);
   const [journeyReports, setJourneyReports] = useState<any[]>([]);
   const [doctorReports, setDoctorReports] = useState<any[]>([]);
+  const [labOrders, setLabOrders] = useState<any[]>([]);
+  const [checkingLabResults, setCheckingLabResults] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(!selectedWard);
@@ -77,6 +81,9 @@ const GuardianReports = () => {
     } else if (activeSection === "journeys") {
       supabase.from("journey_reports").select("*").eq("user_id", wardUserId).order("ended_at", { ascending: false }).limit(20)
         .then(({ data }) => setJourneyReports(data || []));
+    } else if (activeSection === "lab_tests") {
+      supabase.from("lab_orders" as any).select("*").eq("user_id", wardUserId).order("created_at", { ascending: false })
+        .then(({ data }) => setLabOrders((data as any) || []));
     } else if (activeSection === "doctor_visit") {
       supabase.from("medical_records")
         .select("id, title, description, record_date, created_at")
@@ -160,6 +167,38 @@ const GuardianReports = () => {
     });
   };
 
+  const refreshLabOrders = async () => {
+    if (!wardUserId) return;
+    const { data } = await supabase.from("lab_orders" as any).select("*").eq("user_id", wardUserId).order("created_at", { ascending: false });
+    setLabOrders((data as any) || []);
+  };
+
+  const handleCheckLabResults = async (order: any) => {
+    setCheckingLabResults(order.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("orange-health", {
+        body: {
+          action: "test-results",
+          primary_patient_number: order.patient_phone,
+          order_id: order.id,
+        },
+      });
+      if (error) throw error;
+      if (data?.ready && data?.data?.report_url) {
+        toast.success("Test report is ready!");
+        await refreshLabOrders();
+        window.open(data.data.report_url, "_blank");
+      } else {
+        toast.info(data?.message || "Sample is being processed by the lab. Report not ready yet.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to check report status");
+    } finally {
+      setCheckingLabResults(null);
+    }
+  };
+
   if (loading) {
     return <AppLayout><div className="p-4 text-center text-muted-foreground">Loading...</div></AppLayout>;
   }
@@ -181,6 +220,7 @@ const GuardianReports = () => {
     { id: "journeys", label: "Journeys", icon: Navigation },
     { id: "hospital_visit", label: "Hospital Visit", icon: BriefcaseMedical },
     { id: "analysis", label: "Analysis Reports", icon: FileSearch },
+    { id: "lab_tests", label: "Lab Tests", icon: TestTube2 },
     ...(isPrimary ? [{ id: "doctor_visit" as ReportSection, label: "Doctor Visit", icon: Stethoscope }] : []),
   ];
 
@@ -356,6 +396,79 @@ const GuardianReports = () => {
         {/* Analysis Reports */}
         {activeSection === "analysis" && wardUserId && (
           <AnalysisReportTab wardUserId={wardUserId} wardName={wardName} />
+        )}
+
+        {/* Lab Tests — Home Lab Test bookings & reports */}
+        {activeSection === "lab_tests" && (
+          <div className="space-y-3">
+            {labOrders.length === 0 ? (
+              <Card>
+                <CardContent className="p-6 text-center text-muted-foreground text-sm">
+                  No lab tests booked yet
+                </CardContent>
+              </Card>
+            ) : (
+              labOrders.map((order: any) => {
+                const tests = Array.isArray(order.tests) ? order.tests : [];
+                const status = String(order.status || "booked");
+                const statusVariant = status === "completed" ? "default" : status === "cancelled" ? "destructive" : "secondary";
+                return (
+                  <Card key={order.id}>
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold">{order.patient_name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Booked {format(new Date(order.created_at), "dd MMM yyyy")}
+                            {order.slot_datetime ? ` • Slot ${format(new Date(order.slot_datetime), "dd MMM, hh:mm a")}` : ""}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          <Badge variant={statusVariant as any} className="capitalize text-[10px]">{status.replace(/_/g, " ")}</Badge>
+                          {order.payment_status && (
+                            <Badge variant="outline" className="capitalize text-[10px]">{order.payment_status}</Badge>
+                          )}
+                        </div>
+                      </div>
+                      {tests.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {tests.map((t: any, i: number) => (
+                            <Badge key={i} variant="outline" className="text-[10px]">{t?.name || "Test"}</Badge>
+                          ))}
+                        </div>
+                      )}
+                      {order.address && (
+                        <p className="text-xs text-muted-foreground line-clamp-2">{order.address}</p>
+                      )}
+                      <div className="flex items-center justify-between gap-2">
+                        {order.total_price != null && (
+                          <p className="text-xs font-semibold">₹{Number(order.total_price).toLocaleString("en-IN")}</p>
+                        )}
+                        <div className="flex gap-2 ml-auto">
+                          {order.report_url ? (
+                            <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => window.open(order.report_url, "_blank")}>
+                              <ExternalLink className="w-3 h-3" /> View Report
+                            </Button>
+                          ) : status !== "cancelled" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 text-xs gap-1"
+                              disabled={checkingLabResults === order.id}
+                              onClick={() => handleCheckLabResults(order)}
+                            >
+                              {checkingLabResults === order.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileSearch className="w-3 h-3" />}
+                              Check Results
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
+          </div>
         )}
 
         {/* Doctor Visit Reports — Primary Guardian only */}
