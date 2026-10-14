@@ -81,6 +81,9 @@ const GuardianReports = () => {
     } else if (activeSection === "journeys") {
       supabase.from("journey_reports").select("*").eq("user_id", wardUserId).order("ended_at", { ascending: false }).limit(20)
         .then(({ data }) => setJourneyReports(data || []));
+    } else if (activeSection === "lab_tests") {
+      supabase.from("lab_orders" as any).select("*").eq("user_id", wardUserId).order("created_at", { ascending: false })
+        .then(({ data }) => setLabOrders((data as any) || []));
     } else if (activeSection === "doctor_visit") {
       supabase.from("medical_records")
         .select("id, title, description, record_date, created_at")
