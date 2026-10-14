@@ -1353,6 +1353,81 @@ export type Database = {
         }
         Relationships: []
       }
+      lab_orders: {
+        Row: {
+          address: string
+          city_request_id: string | null
+          created_at: string
+          id: string
+          latitude: number | null
+          longitude: number | null
+          notes: string | null
+          orange_order_id: string | null
+          patient_age: number | null
+          patient_gender: string | null
+          patient_name: string
+          patient_phone: string
+          payment_status: string
+          raw_response: Json | null
+          report_data: Json | null
+          report_url: string | null
+          slot_datetime: string | null
+          status: string
+          tests: Json
+          total_price: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address: string
+          city_request_id?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          orange_order_id?: string | null
+          patient_age?: number | null
+          patient_gender?: string | null
+          patient_name: string
+          patient_phone: string
+          payment_status?: string
+          raw_response?: Json | null
+          report_data?: Json | null
+          report_url?: string | null
+          slot_datetime?: string | null
+          status?: string
+          tests?: Json
+          total_price?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string
+          city_request_id?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          orange_order_id?: string | null
+          patient_age?: number | null
+          patient_gender?: string | null
+          patient_name?: string
+          patient_phone?: string
+          payment_status?: string
+          raw_response?: Json | null
+          report_data?: Json | null
+          report_url?: string | null
+          slot_datetime?: string | null
+          status?: string
+          tests?: Json
+          total_price?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       meal_logs: {
         Row: {
           created_at: string
