@@ -46,6 +46,8 @@ const GuardianReports = () => {
   const [mealLogs, setMealLogs] = useState<any[]>([]);
   const [journeyReports, setJourneyReports] = useState<any[]>([]);
   const [doctorReports, setDoctorReports] = useState<any[]>([]);
+  const [labOrders, setLabOrders] = useState<any[]>([]);
+  const [checkingLabResults, setCheckingLabResults] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(!selectedWard);
