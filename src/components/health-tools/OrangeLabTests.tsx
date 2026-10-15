@@ -13,7 +13,6 @@ import {
   FileCheck,
   Download,
   Loader2,
-  Plus,
   ShieldCheck,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -80,7 +79,6 @@ export const OrangeLabTests: React.FC = () => {
   const [selectedTests, setSelectedTests] = useState<{ id: string; name: string }[]>([
     { id: "3", name: "Complete Blood Count (CBC)" },
   ]);
-  const [customTestName, setCustomTestName] = useState("");
 
   // Slots state
   const [slotsLoading, setSlotsLoading] = useState(false);
@@ -135,7 +133,7 @@ export const OrangeLabTests: React.FC = () => {
           setLongitude(pos.coords.longitude);
         },
         () => {
-          // Defaults to Bangalore sandbox fallback coordinates
+          // Location permission was not granted; the user can enter an address manually.
         },
         { timeout: 5000 }
       );
@@ -257,17 +255,6 @@ export const OrangeLabTests: React.FC = () => {
     }
   };
 
-  const addCustomTest = () => {
-    if (!customTestName.trim()) return;
-    const newTest = {
-      id: String(Date.now()),
-      name: customTestName.trim(),
-    };
-    setSelectedTests([...selectedTests, newTest]);
-    setCustomTestName("");
-    toast.success(`Added "${newTest.name}"`);
-  };
-
   // Submit booking order
   const handleBookOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -289,6 +276,8 @@ export const OrangeLabTests: React.FC = () => {
           primary_patient_name: patientName.trim(),
           primary_patient_number: patientPhone.replace(/\D/g, "").slice(-10),
           slot_datetime: selectedSlot,
+          payment_type: "paid_by_patient",
+          selected_tests: selectedTests.map((test) => ({ test_id: test.id, name: test.name })),
           partner_notes: "Sample collection for elder care - Check-iN Health",
           patient_details: [
             {
@@ -321,9 +310,17 @@ export const OrangeLabTests: React.FC = () => {
         throw new Error(msg);
       }
 
-      setBookedSuccess(data?.order || { success: true });
-      toast.success("Home Lab Test collection booked successfully!");
-      loadOrders();
+      if (data?.success !== true || data?.provider_accepted !== true) {
+        throw new Error("Orange Health did not confirm the booking. Please check your bookings before retrying.");
+      }
+
+      setBookedSuccess(data?.order || data?.provider || { success: true });
+      if (data?.saved === false) {
+        toast.error(data?.warning || "Orange Health accepted the booking, but the local record could not be saved. Contact support before retrying.");
+      } else {
+        toast.success("Home Lab Test collection booked successfully!");
+      }
+      await loadOrders();
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || "Failed to book home lab test");
@@ -363,7 +360,7 @@ export const OrangeLabTests: React.FC = () => {
 
   // Preserve provider wall-clock times instead of timezone-shifting naive ISO strings.
   const getSlotParts = (slotValue: string) => {
-    const match = slotValue.match(/^(\\d{4}-\\d{2}-\\d{2})T(\\d{2}):(\\d{2})(?::(\\d{2}))?/);
+    const match = slotValue.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
     if (match) return { date: match[1], time: `${match[2]}:${match[3]}` };
     const parsed = new Date(slotValue);
     if (Number.isNaN(parsed.getTime())) return { date: "", time: slotValue };
@@ -377,7 +374,7 @@ export const OrangeLabTests: React.FC = () => {
 
   const formatSlotTime = (slotValue: string) => {
     const { time } = getSlotParts(slotValue);
-    const match = time.match(/^(\\d{1,2}):(\\d{2})$/);
+    const match = time.match(/^(\d{1,2}):(\d{2})$/);
     if (!match) return time || slotValue;
     const hour = Number(match[1]);
     return `${hour % 12 || 12}:${match[2]} ${hour >= 12 ? "PM" : "AM"}`;
@@ -552,32 +549,7 @@ export const OrangeLabTests: React.FC = () => {
                 })}
               </div>
 
-              {/* Custom Test Entry */}
-              <div className="pt-2 border-t flex items-center gap-2">
-                <Input
-                  placeholder="Need another specific test? (e.g. Serum Creatinine, Uric Acid)"
-                  value={customTestName}
-                  onChange={(e) => setCustomTestName(e.target.value)}
-                  className="text-xs h-9"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addCustomTest();
-                    }
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addCustomTest}
-                  className="h-9 shrink-0 gap-1 text-xs"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Add
-                </Button>
-              </div>
-
+              {/* Only Orange Health catalogue IDs can be submitted to the provider. */}
               {/* Selected summary */}
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {selectedTests.map((t) => (
