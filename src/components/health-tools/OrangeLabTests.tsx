@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,11 +12,7 @@ import {
   CheckCircle2,
   FileCheck,
   Download,
-  AlertCircle,
   Loader2,
-  Plus,
-  Trash2,
-  ExternalLink,
   ShieldCheck,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,7 +20,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
 interface SlotInfo {
-  slot_datetime: string;
+  slot_datetime?: string;
   is_morning_slot: boolean;
   is_afternoon_slot: boolean;
   is_evening_slot: boolean;
@@ -69,18 +65,20 @@ export const OrangeLabTests: React.FC = () => {
   const [patientAge, setPatientAge] = useState("");
   const [patientGender, setPatientGender] = useState("male");
   const [address, setAddress] = useState("");
-  const [latitude, setLatitude] = useState<number | null>(12.93922);
-  const [longitude, setLongitude] = useState<number | null>(77.62539);
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
   const [requestDate, setRequestDate] = useState(() => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split("T")[0];
+    const year = tomorrow.getFullYear();
+    const month = String(tomorrow.getMonth() + 1).padStart(2, "0");
+    const day = String(tomorrow.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   });
 
   const [selectedTests, setSelectedTests] = useState<{ id: string; name: string }[]>([
     { id: "3", name: "Complete Blood Count (CBC)" },
   ]);
-  const [customTestName, setCustomTestName] = useState("");
 
   // Slots state
   const [slotsLoading, setSlotsLoading] = useState(false);
@@ -135,57 +133,88 @@ export const OrangeLabTests: React.FC = () => {
           setLongitude(pos.coords.longitude);
         },
         () => {
-          // Defaults to Bangalore sandbox fallback coordinates
+          // Location permission was not granted; the user can enter an address manually.
         },
         { timeout: 5000 }
       );
     }
   }, []);
 
-  // Fetch slots whenever lat/long or date changes
-  const checkSlots = async () => {
+  // Fetch slots for the selected date and collection location.
+  const checkSlots = useCallback(async (showToast = true) => {
     if (!requestDate) return;
+    const trimmedAddress = address.trim();
+    const hasCoordinates = latitude !== null && longitude !== null;
+
+    if (!trimmedAddress && !hasCoordinates) {
+      setSlots({});
+      setSelectedSlot(null);
+      setServiceableStatus("Enter your collection address or allow location access to check slots.");
+      return;
+    }
+
     setSlotsLoading(true);
     setServiceableStatus(null);
     try {
-      const { data, error } = await supabase.functions.invoke("orange-health", {
-        body: {
-          action: "serviceability",
-          latitude: latitude || 12.93922,
-          longitude: longitude || 77.62539,
-          request_date: requestDate,
-          address: address || undefined,
-        },
-      });
+      const requestBody: Record<string, unknown> = {
+        action: "serviceability",
+        request_date: requestDate,
+      };
+      if (trimmedAddress) requestBody.address = trimmedAddress;
+      else if (hasCoordinates) {
+        requestBody.latitude = latitude;
+        requestBody.longitude = longitude;
+      }
 
+      const { data, error } = await supabase.functions.invoke("orange-health", { body: requestBody });
       if (error) {
         console.error("Slots fetch error:", error);
-        toast.error("Could not fetch available slots for this date");
+        setSlots({});
+        setSelectedSlot(null);
+        setServiceableStatus("Could not fetch slots. Please refresh and try again.");
+        if (showToast) toast.error("Could not fetch available slots for this date");
         return;
       }
 
-      const resData = data?.data;
-      if (resData?.slots && Object.keys(resData.slots).length > 0) {
-        setSlots(resData.slots);
-        setServiceableStatus(resData.status || "Location is serviceable");
-        const firstSlot = Object.keys(resData.slots)[0];
-        setSelectedSlot(firstSlot);
+      if (data?.error) {
+        const message = data?.details?.status || data?.details?.message || data?.error ||
+          "Could not check collection availability.";
+        setSlots({});
+        setSelectedSlot(null);
+        setServiceableStatus(message);
+        if (showToast) toast.error(message);
+        return;
+      }
+
+      const responseData = data?.data;
+      const availableSlots = responseData?.slots;
+      if (availableSlots && Object.keys(availableSlots).length > 0) {
+        setSlots(availableSlots);
+        setServiceableStatus(responseData.status || "Location is serviceable");
+        const firstEntry = Object.entries(availableSlots)[0] as [string, SlotInfo];
+        setSelectedSlot(firstEntry[1]?.slot_datetime || firstEntry[0]);
       } else {
         setSlots({});
-        setServiceableStatus(resData?.status || "No collection slots available for this date");
         setSelectedSlot(null);
+        setServiceableStatus(responseData?.status ||
+          "No collection slots available for this date. Please choose another date.");
       }
     } catch (err) {
-      console.error(err);
-      toast.error("Failed to check serviceability");
+      console.error("Failed to check serviceability:", err);
+      setSlots({});
+      setSelectedSlot(null);
+      setServiceableStatus("Failed to check serviceability. Please try again.");
+      if (showToast) toast.error("Failed to check serviceability");
     } finally {
       setSlotsLoading(false);
     }
-  };
+  }, [requestDate, address, latitude, longitude]);
 
+  // Debounce address edits so serviceability is not checked on every keystroke.
   useEffect(() => {
-    checkSlots();
-  }, [requestDate, latitude, longitude]);
+    const timeoutId = window.setTimeout(() => { void checkSlots(false); }, address.trim() ? 600 : 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [checkSlots]);
 
   // Load user's lab orders
   const loadOrders = async () => {
@@ -226,17 +255,6 @@ export const OrangeLabTests: React.FC = () => {
     }
   };
 
-  const addCustomTest = () => {
-    if (!customTestName.trim()) return;
-    const newTest = {
-      id: String(Date.now()),
-      name: customTestName.trim(),
-    };
-    setSelectedTests([...selectedTests, newTest]);
-    setCustomTestName("");
-    toast.success(`Added "${newTest.name}"`);
-  };
-
   // Submit booking order
   const handleBookOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -254,11 +272,12 @@ export const OrangeLabTests: React.FC = () => {
         body: {
           action: "create-order",
           address,
-          latitude: latitude || 12.93922,
-          longitude: longitude || 77.62539,
+          ...(latitude !== null && longitude !== null ? { latitude, longitude } : {}),
           primary_patient_name: patientName.trim(),
           primary_patient_number: patientPhone.replace(/\D/g, "").slice(-10),
           slot_datetime: selectedSlot,
+          payment_type: "paid_by_patient",
+          selected_tests: selectedTests.map((test) => ({ test_id: test.id, name: test.name })),
           partner_notes: "Sample collection for elder care - Check-iN Health",
           patient_details: [
             {
@@ -291,9 +310,17 @@ export const OrangeLabTests: React.FC = () => {
         throw new Error(msg);
       }
 
-      setBookedSuccess(data?.order || { success: true });
-      toast.success("Home Lab Test collection booked successfully!");
-      loadOrders();
+      if (data?.success !== true || data?.provider_accepted !== true) {
+        throw new Error("Orange Health did not confirm the booking. Please check your bookings before retrying.");
+      }
+
+      setBookedSuccess(data?.order || data?.provider || { success: true });
+      if (data?.saved === false) {
+        toast.error(data?.warning || "Orange Health accepted the booking, but the local record could not be saved. Contact support before retrying.");
+      } else {
+        toast.success("Home Lab Test collection booked successfully!");
+      }
+      await loadOrders();
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || "Failed to book home lab test");
@@ -331,13 +358,36 @@ export const OrangeLabTests: React.FC = () => {
     }
   };
 
-  const formatSlotTime = (slotStr: string) => {
-    try {
-      const d = new Date(slotStr);
-      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
-    } catch {
-      return slotStr;
-    }
+  // Preserve provider wall-clock times instead of timezone-shifting naive ISO strings.
+  const getSlotParts = (slotValue: string) => {
+    const match = slotValue.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
+    if (match) return { date: match[1], time: `${match[2]}:${match[3]}` };
+    const parsed = new Date(slotValue);
+    if (Number.isNaN(parsed.getTime())) return { date: "", time: slotValue };
+    const year = parsed.getFullYear();
+    const month = String(parsed.getMonth() + 1).padStart(2, "0");
+    const day = String(parsed.getDate()).padStart(2, "0");
+    const hours = String(parsed.getHours()).padStart(2, "0");
+    const minutes = String(parsed.getMinutes()).padStart(2, "0");
+    return { date: `${year}-${month}-${day}`, time: `${hours}:${minutes}` };
+  };
+
+  const formatSlotTime = (slotValue: string) => {
+    const { time } = getSlotParts(slotValue);
+    const match = time.match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) return time || slotValue;
+    const hour = Number(match[1]);
+    return `${hour % 12 || 12}:${match[2]} ${hour >= 12 ? "PM" : "AM"}`;
+  };
+
+  const formatSlotDateTime = (slotValue: string) => {
+    const { date } = getSlotParts(slotValue);
+    const dateLabel = date
+      ? new Date(`${date}T12:00:00`).toLocaleDateString(undefined, {
+          year: "numeric", month: "short", day: "numeric",
+        })
+      : "";
+    return [dateLabel, formatSlotTime(slotValue)].filter(Boolean).join(" at ");
   };
 
   return (
@@ -408,7 +458,7 @@ export const OrangeLabTests: React.FC = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Scheduled Slot:</span>
-                <span className="font-semibold">{selectedSlot ? new Date(selectedSlot).toLocaleString() : ""}</span>
+                <span className="font-semibold">{selectedSlot ? formatSlotDateTime(selectedSlot) : ""}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Payment Mode:</span>
@@ -499,32 +549,7 @@ export const OrangeLabTests: React.FC = () => {
                 })}
               </div>
 
-              {/* Custom Test Entry */}
-              <div className="pt-2 border-t flex items-center gap-2">
-                <Input
-                  placeholder="Need another specific test? (e.g. Serum Creatinine, Uric Acid)"
-                  value={customTestName}
-                  onChange={(e) => setCustomTestName(e.target.value)}
-                  className="text-xs h-9"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addCustomTest();
-                    }
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addCustomTest}
-                  className="h-9 shrink-0 gap-1 text-xs"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Add
-                </Button>
-              </div>
-
+              {/* Only Orange Health catalogue IDs can be submitted to the provider. */}
               {/* Selected summary */}
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {selectedTests.map((t) => (
@@ -647,7 +672,7 @@ export const OrangeLabTests: React.FC = () => {
                   <Input
                     type="date"
                     value={requestDate}
-                    min={new Date().toISOString().split("T")[0]}
+                    min={`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`}
                     onChange={(e) => setRequestDate(e.target.value)}
                     className="text-xs h-9"
                   />
@@ -657,7 +682,7 @@ export const OrangeLabTests: React.FC = () => {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={checkSlots}
+                  onClick={() => void checkSlots()}
                   disabled={slotsLoading}
                   className="mt-5 text-xs h-9"
                 >
@@ -680,19 +705,20 @@ export const OrangeLabTests: React.FC = () => {
                 ) : Object.keys(slots).length > 0 ? (
                   <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
                     {Object.entries(slots).map(([slotKey, info]) => {
-                      const isSelected = selectedSlot === slotKey;
+                      const slotDateTime = info?.slot_datetime || slotKey;
+                      const isSelected = selectedSlot === slotDateTime;
                       return (
                         <button
                           key={slotKey}
                           type="button"
-                          onClick={() => setSelectedSlot(slotKey)}
+                          onClick={() => setSelectedSlot(slotDateTime)}
                           className={`p-2.5 rounded-xl border text-center transition-all ${
                             isSelected
                               ? "border-orange-500 bg-orange-600 text-white shadow-sm"
                               : "border-border/70 hover:border-orange-500/40 bg-card text-foreground"
                           }`}
                         >
-                          <div className="text-xs font-bold">{formatSlotTime(slotKey)}</div>
+                          <div className="text-xs font-bold">{formatSlotTime(slotDateTime)}</div>
                           <div className={`text-[10px] mt-0.5 ${isSelected ? "text-orange-100" : "text-muted-foreground"}`}>
                             {info.is_morning_slot
                               ? "Morning"
@@ -803,7 +829,7 @@ export const OrangeLabTests: React.FC = () => {
                       </div>
 
                       <div className="text-xs text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
-                        <span>📅 Slot: {new Date(ord.slot_datetime).toLocaleString()}</span>
+                        <span>📅 Slot: {formatSlotDateTime(ord.slot_datetime)}</span>
                         <span>📍 {ord.address}</span>
                       </div>
 
