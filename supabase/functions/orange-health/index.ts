@@ -208,12 +208,18 @@ serve(async (req) => {
             );
           }
         }
+        console.log("Serviceability location resolved:", {
+          hasLocation: Boolean(location),
+          latitude: location?.latitude ?? null,
+          longitude: location?.longitude ?? null,
+        });
 
         if (location) {
           params.set("latitude", location.latitude);
           params.set("longitude", location.longitude);
         }
       } catch (error) {
+        console.error("Serviceability location resolution failed:", error);
         return jsonResponse(
           {
             error: error instanceof Error ? error.message : "Could not resolve the collection location",
