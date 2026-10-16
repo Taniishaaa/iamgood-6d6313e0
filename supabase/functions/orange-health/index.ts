@@ -67,90 +67,6 @@ function getLocation(latitude: unknown, longitude: unknown) {
   return { latitude: String(lat), longitude: String(lng) };
 }
 
-function parseCoordinatesFromText(value: string) {
-  // Accept decimal coordinates, e.g. "12.9408, 77.6267".
-  const decimalMatch = value.trim().match(/^(-?\d{1,3}(?:\.\d+)?)\s*[,;]\s*(-?\d{1,3}(?:\.\d+)?)$/);
-
-  if (decimalMatch) {
-    try {
-      return getLocation(decimalMatch[1], decimalMatch[2]);
-    } catch {
-      return null;
-    }
-  }
-
-  // Accept DMS coordinates, e.g. 12°56'26.9"N 77°37'36.1"E.
-  const dmsMatches = [...value.matchAll(/(\d{1,3})\s*°\s*(\d{1,2})\s*['′]\s*(\d{1,2}(?:\.\d+)?)\s*["″]?\s*([NS])/gi)];
-  const longitudeMatch = value.match(/(\d{1,3})\s*°\s*(\d{1,2})\s*['′]\s*(\d{1,2}(?:\.\d+)?)\s*["″]?\s*([EW])/i);
-
-  if (dmsMatches.length !== 1 || !longitudeMatch) return null;
-
-  const toDecimal = (match: RegExpMatchArray) => {
-    const degrees = Number(match[1]);
-    const minutes = Number(match[2]);
-    const seconds = Number(match[3]);
-    const direction = match[4].toUpperCase();
-    const magnitude = degrees + minutes / 60 + seconds / 3600;
-    return direction === "S" || direction === "W" ? -magnitude : magnitude;
-  };
-
-  try {
-    return getLocation(toDecimal(dmsMatches[0]), toDecimal(longitudeMatch));
-  } catch {
-    return null;
-  }
-}
-
-async function geocodeAddress(address: string) {
-  const query = address.trim();
-
-  if (!query) {
-    throw new Error("Enter a collection address.");
-  }
-
-  // Coordinate text does not need geocoding.
-  const coordinates = parseCoordinatesFromText(query);
-  if (coordinates) return coordinates;
-
-  // OpenStreetMap Nominatim geocoding.
-  const url = new URL("https://nominatim.openstreetmap.org/search");
-  url.searchParams.set("q", query);
-  url.searchParams.set("format", "jsonv2");
-  url.searchParams.set("limit", "1");
-
-  const response = await fetch(url.toString(), {
-    headers: {
-      "User-Agent": "FutureWaveCheckIn/1.0",
-      Accept: "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text();
-
-    console.error("Nominatim geocoding failed:", {
-      status: response.status,
-      statusText: response.statusText,
-      response: errorBody.slice(0, 500),
-    });
-
-    throw new Error(`Address lookup failed (HTTP ${response.status}). Please try again.`);
-  }
-
-  const results = await response.json();
-
-  if (!Array.isArray(results) || results.length === 0) {
-    throw new Error("Could not find coordinates for this address. Please enter a more complete address.");
-  }
-
-  const location = getLocation(results[0].lat, results[0].lon);
-  if (!location) {
-    throw new Error("Could not resolve the address to coordinates.");
-  }
-
-  return location;
-}
-
 serve(async (req) => {
   console.log("orange-health request received:", req.method);
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -197,15 +113,15 @@ serve(async (req) => {
 
       const params = new URLSearchParams({ request_date });
 
-      try {
-        let location: { latitude: string; longitude: string } | null = null;
-
-        if (address) {
-          location = await geocodeAddress(address);
-        } else if (pincode) {
-          params.set("pincode", String(pincode).trim());
-        } else {
-          location = getLocation(latitude, longitude);
+      // Orange Health supports address-based serviceability and geocodes the
+      // address internally. Prefer the selected collection address when present.
+      if (address) {
+        params.set("address", address);
+      } else if (pincode) {
+        params.set("pincode", String(pincode).trim());
+      } else {
+        try {
+          const location = getLocation(latitude, longitude);
 
           if (!location) {
             return jsonResponse(
@@ -215,32 +131,25 @@ serve(async (req) => {
               400,
             );
           }
-        }
-        console.log("Serviceability location resolved:", {
-          hasLocation: Boolean(location),
-          latitude: location?.latitude ?? null,
-          longitude: location?.longitude ?? null,
-        });
 
-        if (location) {
           params.set("latitude", location.latitude);
           params.set("longitude", location.longitude);
+        } catch (error) {
+          return jsonResponse(
+            {
+              error: error instanceof Error ? error.message : "Invalid coordinates",
+            },
+            400,
+          );
         }
-      } catch (error) {
-        console.error("Serviceability location resolution failed:", error);
-        return jsonResponse(
-          {
-            error: error instanceof Error ? error.message : "Could not resolve the collection location",
-          },
-          400,
-        );
       }
+
       console.log("Orange Health serviceability request:", {
         requestDate: request_date,
+        hasAddressParam: params.has("address"),
         latitude: params.get("latitude"),
         longitude: params.get("longitude"),
         pincode: params.get("pincode"),
-        hasAddressParam: params.has("address"),
       });
 
       const response = await fetch(`${BASE_URL}/v1/partner/serviceability?${params.toString()}`, {
