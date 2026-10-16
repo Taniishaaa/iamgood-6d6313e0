@@ -223,7 +223,14 @@ try {
     400
   );
 }
-
+console.log("Orange Health serviceability request:", {
+  requestDate: request_date,
+  latitude: params.get("latitude"),
+  longitude: params.get("longitude"),
+  pincode: params.get("pincode"),
+  hasAddressParam: params.has("address"),
+});
+      
 const response = await fetch(
   `${BASE_URL}/v1/partner/serviceability?${params.toString()}`,
   {
