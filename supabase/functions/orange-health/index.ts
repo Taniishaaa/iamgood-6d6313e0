@@ -187,7 +187,6 @@ serve(async (req) => {
       const address = typeof body.address === "string" ? body.address.trim() : "";
       if (!validDate(request_date)) return jsonResponse({ error: "request_date must be a valid YYYY-MM-DD date" }, 400);
 
-    
 const params = new URLSearchParams({ request_date });
 
 try {
