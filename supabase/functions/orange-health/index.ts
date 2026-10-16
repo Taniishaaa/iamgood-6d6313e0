@@ -36,9 +36,11 @@ function validDate(value: unknown): value is string {
 }
 
 function validSlotDateTime(value: unknown): value is string {
-  return typeof value === "string" &&
+  return (
+    typeof value === "string" &&
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/.test(value) &&
-    !Number.isNaN(new Date(value).getTime());
+    !Number.isNaN(new Date(value).getTime())
+  );
 }
 
 function cleanPhone(value: unknown): string {
@@ -50,19 +52,24 @@ function getLocation(latitude: unknown, longitude: unknown) {
   const lat = latitude === null || latitude === undefined || latitude === "" ? null : Number(latitude);
   const lng = longitude === null || longitude === undefined || longitude === "" ? null : Number(longitude);
   if (lat === null && lng === null) return null;
-  if (lat === null || lng === null || !Number.isFinite(lat) || !Number.isFinite(lng) ||
-      lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+  if (
+    lat === null ||
+    lng === null ||
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng) ||
+    lat < -90 ||
+    lat > 90 ||
+    lng < -180 ||
+    lng > 180
+  ) {
     throw new Error("Both valid latitude and longitude are required when coordinates are provided.");
   }
   return { latitude: String(lat), longitude: String(lng) };
 }
 
-
 function parseCoordinatesFromText(value: string) {
   // Accept decimal coordinates, e.g. "12.9408, 77.6267".
-  const decimalMatch = value.trim().match(
-    /^(-?\d{1,3}(?:\.\d+)?)\s*[,;]\s*(-?\d{1,3}(?:\.\d+)?)$/
-  );
+  const decimalMatch = value.trim().match(/^(-?\d{1,3}(?:\.\d+)?)\s*[,;]\s*(-?\d{1,3}(?:\.\d+)?)$/);
 
   if (decimalMatch) {
     try {
@@ -73,14 +80,8 @@ function parseCoordinatesFromText(value: string) {
   }
 
   // Accept DMS coordinates, e.g. 12°56'26.9"N 77°37'36.1"E.
-  const dmsMatches = [
-    ...value.matchAll(
-      /(\d{1,3})\s*°\s*(\d{1,2})\s*['′]\s*(\d{1,2}(?:\.\d+)?)\s*["″]?\s*([NS])/gi
-    ),
-  ];
-  const longitudeMatch = value.match(
-    /(\d{1,3})\s*°\s*(\d{1,2})\s*['′]\s*(\d{1,2}(?:\.\d+)?)\s*["″]?\s*([EW])/i
-  );
+  const dmsMatches = [...value.matchAll(/(\d{1,3})\s*°\s*(\d{1,2})\s*['′]\s*(\d{1,2}(?:\.\d+)?)\s*["″]?\s*([NS])/gi)];
+  const longitudeMatch = value.match(/(\d{1,3})\s*°\s*(\d{1,2})\s*['′]\s*(\d{1,2}(?:\.\d+)?)\s*["″]?\s*([EW])/i);
 
   if (dmsMatches.length !== 1 || !longitudeMatch) return null;
 
@@ -94,10 +95,7 @@ function parseCoordinatesFromText(value: string) {
   };
 
   try {
-    return getLocation(
-      toDecimal(dmsMatches[0]),
-      toDecimal(longitudeMatch)
-    );
+    return getLocation(toDecimal(dmsMatches[0]), toDecimal(longitudeMatch));
   } catch {
     return null;
   }
@@ -123,7 +121,7 @@ async function geocodeAddress(address: string) {
   const response = await fetch(url.toString(), {
     headers: {
       "User-Agent": "FutureWaveCheckIn/1.0",
-      "Accept": "application/json",
+      Accept: "application/json",
     },
   });
 
@@ -134,9 +132,7 @@ async function geocodeAddress(address: string) {
   const results = await response.json();
 
   if (!Array.isArray(results) || results.length === 0) {
-    throw new Error(
-      "Could not find coordinates for this address. Please enter a more complete address."
-    );
+    throw new Error("Could not find coordinates for this address. Please enter a more complete address.");
   }
 
   const location = getLocation(results[0].lat, results[0].lon);
@@ -147,8 +143,8 @@ async function geocodeAddress(address: string) {
   return location;
 }
 
-
 serve(async (req) => {
+  console.log("orange-health request received:", req.method);
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
@@ -168,13 +164,17 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
     const serviceClient = createClient(supabaseUrl, serviceRoleKey);
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
     if (userError || !user) return jsonResponse({ error: "Unauthorized" }, 401);
 
     const apiKey = Deno.env.get("ORANGE_HEALTH_API_KEY");
     const body = await req.json().catch(() => null);
     if (!body || typeof body !== "object") return jsonResponse({ error: "A valid JSON body is required" }, 400);
     const { action } = body;
+    console.log("orange-health action:", action);
 
     if (["serviceability", "discover", "create-order", "test-results", "cancel-order"].includes(action) && !apiKey) {
       console.error("ORANGE_HEALTH_API_KEY Supabase secret is not configured.");
@@ -187,72 +187,67 @@ serve(async (req) => {
       const address = typeof body.address === "string" ? body.address.trim() : "";
       if (!validDate(request_date)) return jsonResponse({ error: "request_date must be a valid YYYY-MM-DD date" }, 400);
 
-const params = new URLSearchParams({ request_date });
+      const params = new URLSearchParams({ request_date });
 
-try {
-  let location: { latitude: string; longitude: string } | null = null;
+      try {
+        let location: { latitude: string; longitude: string } | null = null;
 
-  if (address) {
-    location = await geocodeAddress(address);
-  } else if (pincode) {
-    params.set("pincode", String(pincode).trim());
-  } else {
-    location = getLocation(latitude, longitude);
+        if (address) {
+          location = await geocodeAddress(address);
+        } else if (pincode) {
+          params.set("pincode", String(pincode).trim());
+        } else {
+          location = getLocation(latitude, longitude);
 
-    if (!location) {
-      return jsonResponse(
-        {
-          error: "Provide a collection address, pincode, or coordinates",
-        },
-        400
-      );
+          if (!location) {
+            return jsonResponse(
+              {
+                error: "Provide a collection address, pincode, or coordinates",
+              },
+              400,
+            );
+          }
+        }
+
+        if (location) {
+          params.set("latitude", location.latitude);
+          params.set("longitude", location.longitude);
+        }
+      } catch (error) {
+        return jsonResponse(
+          {
+            error: error instanceof Error ? error.message : "Could not resolve the collection location",
+          },
+          400,
+        );
+      }
+      console.log("Orange Health serviceability request:", {
+        requestDate: request_date,
+        latitude: params.get("latitude"),
+        longitude: params.get("longitude"),
+        pincode: params.get("pincode"),
+        hasAddressParam: params.has("address"),
+      });
+
+      const response = await fetch(`${BASE_URL}/v1/partner/serviceability?${params.toString()}`, {
+        headers: { api_key: apiKey! },
+      });
+
+      const data = await readJson(response);
+
+      if (!response.ok) {
+        return jsonResponse(
+          {
+            error: "Orange Health serviceability request failed",
+            details: data,
+            provider_status: response.status,
+          },
+          response.status,
+        );
+      }
+
+      return jsonResponse({ status: response.status, data });
     }
-  }
-
-  if (location) {
-    params.set("latitude", location.latitude);
-    params.set("longitude", location.longitude);
-  }
-} catch (error) {
-  return jsonResponse(
-    {
-      error: error instanceof Error
-        ? error.message
-        : "Could not resolve the collection location",
-    },
-    400
-  );
-}
-console.log("Orange Health serviceability request:", {
-  requestDate: request_date,
-  latitude: params.get("latitude"),
-  longitude: params.get("longitude"),
-  pincode: params.get("pincode"),
-  hasAddressParam: params.has("address"),
-});
-      
-const response = await fetch(
-  `${BASE_URL}/v1/partner/serviceability?${params.toString()}`,
-  {
-    headers: { api_key: apiKey! },
-  }
-);
-
-const data = await readJson(response);
-
-if (!response.ok) {
-  return jsonResponse(
-    {
-      error: "Orange Health serviceability request failed",
-      details: data,
-      provider_status: response.status,
-    },
-    response.status
-  );
-}
-
-return jsonResponse({ status: response.status, data });
-
 
     // Discover supported tests/packages. Location parameters are mutually exclusive.
     if (action === "discover") {
@@ -276,7 +271,11 @@ return jsonResponse({ status: response.status, data });
         headers: { api_key: apiKey! },
       });
       const data = await readJson(response);
-      if (!response.ok) return jsonResponse({ error: "Orange Health test discovery failed", details: data, provider_status: response.status }, response.status);
+      if (!response.ok)
+        return jsonResponse(
+          { error: "Orange Health test discovery failed", details: data, provider_status: response.status },
+          response.status,
+        );
       return jsonResponse({ status: response.status, data });
     }
 
@@ -289,9 +288,21 @@ return jsonResponse({ status: response.status, data });
       const patientDetails = body.patient_details;
       const paymentType = body.payment_type === "paid_by_group" ? "paid_by_group" : "paid_by_patient";
 
-      if (!address || !primaryName || primaryPhone.length !== 10 || !validSlotDateTime(slotDateTime) ||
-          !Array.isArray(patientDetails) || patientDetails.length === 0) {
-        return jsonResponse({ error: "Missing or invalid booking details. Address, patient name, 10-digit phone, valid slot_datetime and patient_details are required." }, 400);
+      if (
+        !address ||
+        !primaryName ||
+        primaryPhone.length !== 10 ||
+        !validSlotDateTime(slotDateTime) ||
+        !Array.isArray(patientDetails) ||
+        patientDetails.length === 0
+      ) {
+        return jsonResponse(
+          {
+            error:
+              "Missing or invalid booking details. Address, patient name, 10-digit phone, valid slot_datetime and patient_details are required.",
+          },
+          400,
+        );
       }
 
       const normalizedPatients = [];
@@ -302,7 +313,10 @@ return jsonResponse({ status: response.status, data });
         const tests = Array.isArray(patient?.tests) ? patient.tests : [];
         const packages = Array.isArray(patient?.packages) ? patient.packages : [];
         if (!name || !age || !["male", "female", "other"].includes(gender) || (!tests.length && !packages.length)) {
-          return jsonResponse({ error: "Each patient must have a name, age, valid gender, and at least one test or package." }, 400);
+          return jsonResponse(
+            { error: "Each patient must have a name, age, valid gender, and at least one test or package." },
+            400,
+          );
         }
         normalizedPatients.push({
           ...(patient.partner_reference_id ? { partner_reference_id: String(patient.partner_reference_id) } : {}),
@@ -311,7 +325,9 @@ return jsonResponse({ status: response.status, data });
           age,
           gender,
           ...(tests.length ? { tests: tests.map((test: JsonObject) => ({ test_id: String(test.test_id) })) } : {}),
-          ...(packages.length ? { packages: packages.map((pkg: JsonObject) => ({ package_id: String(pkg.package_id) })) } : {}),
+          ...(packages.length
+            ? { packages: packages.map((pkg: JsonObject) => ({ package_id: String(pkg.package_id) })) }
+            : {}),
         });
       }
 
@@ -343,11 +359,17 @@ return jsonResponse({ status: response.status, data });
       // Orange documents HTTP 425 as a duplicate/previously accepted request. Do not create a new local row
       // or report a confirmed booking unless we have an accepted provider response.
       if (!response.ok) {
-        return jsonResponse({
-          error: response.status === 425 ? "Orange Health reports this request was already accepted. Check My Bookings before retrying." : "Failed to create order with Orange Health",
-          details: providerData,
-          provider_status: response.status,
-        }, response.status);
+        return jsonResponse(
+          {
+            error:
+              response.status === 425
+                ? "Orange Health reports this request was already accepted. Check My Bookings before retrying."
+                : "Failed to create order with Orange Health",
+            details: providerData,
+            provider_status: response.status,
+          },
+          response.status,
+        );
       }
 
       const firstProviderOrder = Array.isArray(providerData.orders) ? providerData.orders[0] : null;
@@ -361,9 +383,12 @@ return jsonResponse({ status: response.status, data });
         .from("lab_orders")
         .insert({
           user_id: user.id,
-          orange_order_id: firstProviderOrder?.alnumOrderId != null
-            ? String(firstProviderOrder.alnumOrderId)
-            : firstProviderOrder?.id != null ? String(firstProviderOrder.id) : null,
+          orange_order_id:
+            firstProviderOrder?.alnumOrderId != null
+              ? String(firstProviderOrder.alnumOrderId)
+              : firstProviderOrder?.id != null
+                ? String(firstProviderOrder.id)
+                : null,
           city_request_id: providerData.request_id != null ? String(providerData.request_id) : null,
           patient_name: primaryName,
           patient_phone: primaryPhone,
@@ -385,49 +410,90 @@ return jsonResponse({ status: response.status, data });
       if (dbError) {
         console.error("Orange Health accepted booking, but saving lab_orders failed:", dbError);
         // Return provider confirmation but explicitly flag that local persistence failed.
-        return jsonResponse({ success: true, provider_accepted: true, saved: false, order: providerData, warning: "Booking was accepted by Orange Health, but the local booking record could not be saved. Contact support before retrying." }, 200);
+        return jsonResponse(
+          {
+            success: true,
+            provider_accepted: true,
+            saved: false,
+            order: providerData,
+            warning:
+              "Booking was accepted by Orange Health, but the local booking record could not be saved. Contact support before retrying.",
+          },
+          200,
+        );
       }
 
-      return jsonResponse({ success: true, provider_accepted: true, saved: true, order: dbOrder, provider: providerData }, 200);
+      return jsonResponse(
+        { success: true, provider_accepted: true, saved: true, order: dbOrder, provider: providerData },
+        200,
+      );
     }
 
     // Fetch results by primary patient number and update only the current user's local order.
     if (action === "test-results") {
       const numberToQuery = cleanPhone(body.primary_patient_number || user.phone);
       const orderId = typeof body.order_id === "string" ? body.order_id : "";
-      if (numberToQuery.length !== 10) return jsonResponse({ error: "A valid 10-digit primary_patient_number is required" }, 400);
+      if (numberToQuery.length !== 10)
+        return jsonResponse({ error: "A valid 10-digit primary_patient_number is required" }, 400);
 
       if (orderId) {
         const { data: ownedOrder, error: ownedOrderError } = await serviceClient
-          .from("lab_orders").select("id").eq("id", orderId).eq("user_id", user.id).maybeSingle();
+          .from("lab_orders")
+          .select("id")
+          .eq("id", orderId)
+          .eq("user_id", user.id)
+          .maybeSingle();
         if (ownedOrderError || !ownedOrder) return jsonResponse({ error: "Order not found" }, 404);
       }
 
-      const response = await fetch(`${BASE_URL}/v1/partner/test-results?primary_patient_number=${encodeURIComponent(numberToQuery)}`, {
-        headers: { api_key: apiKey! },
-      });
+      const response = await fetch(
+        `${BASE_URL}/v1/partner/test-results?primary_patient_number=${encodeURIComponent(numberToQuery)}`,
+        {
+          headers: { api_key: apiKey! },
+        },
+      );
       if (response.status === 204) return jsonResponse({ ready: false, message: "Reports not ready yet" });
       const data = await readJson(response);
-      if (!response.ok) return jsonResponse({ error: "Failed to fetch test results", details: data, provider_status: response.status }, response.status);
+      if (!response.ok)
+        return jsonResponse(
+          { error: "Failed to fetch test results", details: data, provider_status: response.status },
+          response.status,
+        );
 
       const reportUrl = data.report_url || data.reportUrl || data.data?.report_url || null;
       if (orderId && reportUrl) {
-        const { error: updateError } = await serviceClient.from("lab_orders").update({
-          report_url: String(reportUrl), report_data: data, status: "completed", updated_at: new Date().toISOString(),
-        }).eq("id", orderId).eq("user_id", user.id);
+        const { error: updateError } = await serviceClient
+          .from("lab_orders")
+          .update({
+            report_url: String(reportUrl),
+            report_data: data,
+            status: "completed",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", orderId)
+          .eq("user_id", user.id);
         if (updateError) console.error("Failed to update lab report:", updateError);
       }
-      return jsonResponse({ ready: Boolean(reportUrl), data, message: reportUrl ? "Test report is ready" : "Reports not ready yet" });
+      return jsonResponse({
+        ready: Boolean(reportUrl),
+        data,
+        message: reportUrl ? "Test report is ready" : "Reports not ready yet",
+      });
     }
 
     // Cancel an order. Ownership is checked against the local record before calling Orange Health.
     if (action === "cancel-order") {
       const requestId = typeof body.city_request_id === "string" ? body.city_request_id.trim() : "";
-      const cancellationReason = typeof body.cancellation_reason === "string" ? body.cancellation_reason : "Customer requested";
+      const cancellationReason =
+        typeof body.cancellation_reason === "string" ? body.cancellation_reason : "Customer requested";
       if (!requestId) return jsonResponse({ error: "city_request_id is required" }, 400);
 
       const { data: ownedOrder, error: ownedOrderError } = await serviceClient
-        .from("lab_orders").select("id").eq("city_request_id", requestId).eq("user_id", user.id).maybeSingle();
+        .from("lab_orders")
+        .select("id")
+        .eq("city_request_id", requestId)
+        .eq("user_id", user.id)
+        .maybeSingle();
       if (ownedOrderError || !ownedOrder) return jsonResponse({ error: "Order not found" }, 404);
 
       const response = await fetch(`${BASE_URL}/v1/partner/${encodeURIComponent(requestId)}/cancel`, {
@@ -436,11 +502,20 @@ return jsonResponse({ status: response.status, data });
         body: JSON.stringify({ cancellation_reason: cancellationReason }),
       });
       const data = await readJson(response);
-      if (!response.ok) return jsonResponse({ error: "Failed to cancel Orange Health booking", details: data, provider_status: response.status }, response.status);
+      if (!response.ok)
+        return jsonResponse(
+          { error: "Failed to cancel Orange Health booking", details: data, provider_status: response.status },
+          response.status,
+        );
 
-      const { error: updateError } = await serviceClient.from("lab_orders").update({
-        status: "cancelled", updated_at: new Date().toISOString(),
-      }).eq("city_request_id", requestId).eq("user_id", user.id);
+      const { error: updateError } = await serviceClient
+        .from("lab_orders")
+        .update({
+          status: "cancelled",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("city_request_id", requestId)
+        .eq("user_id", user.id);
       if (updateError) console.error("Orange booking cancelled but local status update failed:", updateError);
       return jsonResponse({ success: true, status: response.status, data });
     }
