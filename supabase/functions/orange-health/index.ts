@@ -126,7 +126,15 @@ async function geocodeAddress(address: string) {
   });
 
   if (!response.ok) {
-    throw new Error("Address lookup failed. Please try again.");
+    const errorBody = await response.text();
+
+    console.error("Nominatim geocoding failed:", {
+      status: response.status,
+      statusText: response.statusText,
+      response: errorBody.slice(0, 500),
+    });
+
+    throw new Error(`Address lookup failed (HTTP ${response.status}). Please try again.`);
   }
 
   const results = await response.json();
